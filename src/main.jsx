@@ -1485,13 +1485,13 @@ function App() {
 
       const data = await response.json();
 
-      if (!response.ok) {
-        throw new Error(
-          data.error ||
-            data.message ||
-            `Failed to ${walletAction}`
-        );
-      }
+if (!response.ok) {
+  throw new Error(
+    data.message ||
+      data.error ||
+      `Failed to ${walletAction}`
+  );
+}
 
       setBalance(
         Number(data.newBalanceCents || 0) / 100
