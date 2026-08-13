@@ -1521,18 +1521,34 @@ function App() {
     startReelSound();
 
     try {
-      const caseResponse = await apiFetch(
-        `${API}/api/cases/${c.id}`
-      );
+      /*
+       * The case preview already loads the case rewards into
+       * selected.items. Reuse them here instead of making a
+       * second GET request during the click-to-open flow.
+       *
+       * That removes one full Render + Neon round trip from
+       * the critical path before the roulette can begin.
+       */
+      let rewardPool = Array.isArray(c.items)
+        ? c.items
+        : [];
 
-      const caseData =
-        await caseResponse.json();
-
-      if (!caseResponse.ok) {
-        throw new Error(
-          caseData.error ||
-            "Failed to load case rewards"
+      if (!rewardPool.length) {
+        const caseResponse = await apiFetch(
+          `${API}/api/cases/${c.id}`
         );
+
+        const caseData =
+          await caseResponse.json();
+
+        if (!caseResponse.ok) {
+          throw new Error(
+            caseData.error ||
+              "Failed to load case rewards"
+          );
+        }
+
+        rewardPool = caseData.items || [];
       }
 
       const response = await apiFetch(
@@ -1596,19 +1612,31 @@ function App() {
       setReelItems(
         buildReel(
           data.reward,
-          caseData.items || []
+          rewardPool
         )
       );
 
-      await loadInventory();
-      await loadLiveActivity();
-
+      /*
+       * Start the roulette immediately after the opening API
+       * responds. Inventory/activity are refreshed in the
+       * background so they no longer block the animation.
+       */
       window.setTimeout(() => {
         setResult(data.reward);
         setOpening(false);
         setReelTarget(null);
         setReelAnimating(false);
       }, 5800);
+
+      void Promise.all([
+        loadInventory(),
+        loadLiveActivity(),
+      ]).catch((refreshError) => {
+        console.error(
+          "Post-opening account refresh failed:",
+          refreshError
+        );
+      });
     } catch (error) {
       console.error(
         "Case opening failed:",
