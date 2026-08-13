@@ -324,6 +324,27 @@ const caseDescriptions = {
   4: "High-stakes rewards built for the bold.",
 };
 
+const CRYPTO_DEPOSIT_OPTIONS = [
+  { code: "USDTTRC20", label: "USDT · TRC-20" },
+  { code: "USDTERC20", label: "USDT · ERC-20" },
+  { code: "USDTBSC", label: "USDT · BSC" },
+  { code: "USDTMATIC", label: "USDT · Polygon" },
+  { code: "USDTSOL", label: "USDT · Solana" },
+  { code: "USDC", label: "USDC · ERC-20" },
+  { code: "USDCBSC", label: "USDC · BSC" },
+  { code: "USDCMATIC", label: "USDC · Polygon" },
+  { code: "USDCSOL", label: "USDC · Solana" },
+  { code: "SOL", label: "SOL · Solana" },
+  { code: "LTC", label: "LTC · Litecoin" },
+];
+
+function truncateAddress(value, length = 36) {
+  const text = String(value || "");
+  if (text.length <= length) return text;
+  const side = Math.floor(length / 2);
+  return `${text.slice(0, side)}…${text.slice(-side)}`;
+}
+
 function App() {
   const [balance, setBalance] = useState(100);
   const [cases, setCases] = useState(fallbackCases);
@@ -339,6 +360,8 @@ function App() {
   const [walletAction, setWalletAction] = useState("deposit");
   const [walletLoading, setWalletLoading] = useState(false);
   const [walletTab, setWalletTab] = useState("wallet");
+  const [depositCurrency, setDepositCurrency] = useState("USDTTRC20");
+  const [cryptoPayment, setCryptoPayment] = useState(null);
   const [selected, setSelected] = useState(null);
   const [opening, setOpening] = useState(false);
   const [result, setResult] = useState(null);
@@ -971,6 +994,7 @@ function App() {
       setBalance(0);
       setProfileOpen(false);
       setWalletOpen(false);
+      setCryptoPayment(null);
       setSelected(null);
       setResult(null);
       setWonInventoryId(null);
@@ -1451,9 +1475,10 @@ function App() {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            amountCents: Math.round(
-              amount * 100
-            ),
+            amountCents: Math.round(amount * 100),
+            ...(walletAction === "deposit"
+              ? { payCurrency: depositCurrency }
+              : {}),
           }),
         }
       );
@@ -1463,32 +1488,101 @@ function App() {
       if (!response.ok) {
         throw new Error(
           data.error ||
+            data.message ||
             `Failed to ${walletAction}`
         );
       }
 
       setBalance(
-        Number(data.newBalanceCents) / 100
+        Number(data.newBalanceCents || 0) / 100
       );
 
-      setTransactions(
-        data.transactions || []
-      );
-
+      setTransactions(data.transactions || []);
       setWalletAmount("");
 
-      await loadTransactions();
+      if (walletAction === "deposit" && data.payment?.paymentId) {
+        setCryptoPayment({
+          ...data.payment,
+          requestId: data.request?.id || null,
+          status: data.payment.paymentStatus || "waiting",
+        });
+      } else {
+        await loadTransactions();
+      }
     } catch (error) {
-      console.error(
-        `Wallet ${walletAction} failed:`,
-        error
-      );
-
+      console.error(`Wallet ${walletAction} failed:`, error);
       alert(error.message);
     } finally {
       setWalletLoading(false);
     }
   };
+
+  const copyCryptoAddress = async () => {
+    if (!cryptoPayment?.payAddress) return;
+    try {
+      await navigator.clipboard.writeText(cryptoPayment.payAddress);
+      alert("Deposit address copied.");
+    } catch {
+      alert("Unable to copy the address automatically.");
+    }
+  };
+
+  const closeCryptoPayment = () => {
+    setCryptoPayment(null);
+  };
+
+  useEffect(() => {
+    if (!cryptoPayment?.requestId) return;
+
+    let stopped = false;
+    let timer = null;
+
+    const checkPayment = async () => {
+      try {
+        const response = await apiFetch(`${API}/api/me/wallet/requests`);
+        if (!response.ok || stopped) return;
+
+        const data = await response.json();
+        const request = (data.requests || []).find(
+          (item) => Number(item.id) === Number(cryptoPayment.requestId)
+        );
+        if (!request || stopped) return;
+
+        const status = String(request.status || "pending").toLowerCase();
+
+        setCryptoPayment((current) =>
+          current ? { ...current, status } : current
+        );
+
+        if (status === "completed") {
+          const meResponse = await apiFetch(`${API}/api/auth/me`);
+          if (meResponse.ok) {
+            const meData = await meResponse.json();
+            if (meData.user) {
+              setAuthUser(meData.user);
+              setBalance(Number(meData.user.balance_cents || 0) / 100);
+            }
+          }
+          await loadTransactions();
+          if (timer) window.clearInterval(timer);
+        }
+
+        if (["failed", "expired", "refunded", "payment_mismatch"].includes(status)) {
+          if (timer) window.clearInterval(timer);
+        }
+      } catch (error) {
+        console.error("Crypto payment status check failed:", error);
+      }
+    };
+
+    checkPayment();
+    timer = window.setInterval(checkPayment, 4000);
+
+    return () => {
+      stopped = true;
+      if (timer) window.clearInterval(timer);
+    };
+  }, [cryptoPayment?.requestId]);
 
   const sellItem = async (item) => {
     if (!item || sellLoadingId) return;
@@ -3766,131 +3860,125 @@ function App() {
 
             {walletTab !== "history" ? (
               <>
-                <div className="wallet-action-heading">
-                  <div>
-                    <strong>
-                      {walletTab === "withdraw"
-                        ? "Withdraw funds"
-                        : "Add money to your wallet"}
-                    </strong>
-
-                    <span>
-                      {walletTab === "withdraw"
-                        ? "Choose an amount to withdraw from your available balance."
-                        : "Choose a quick amount or enter your own amount."}
-                    </span>
-                  </div>
-
-                  {walletTab === "withdraw" && (
-                    <b className="wallet-withdraw-available">
-                      Available: ${balance.toFixed(2)}
-                    </b>
-                  )}
-                </div>
-
-                <div className="wallet-quick-amounts">
-                  {walletQuickAmounts.map((amount) => {
-                    const exceedsBalance =
-                      walletTab === "withdraw" && amount > balance;
-
-                    return (
-                      <button
-                        key={amount}
-                        type="button"
-                        className={
-                          Number(walletAmount) === amount
-                            ? "active"
-                            : ""
-                        }
-                        onClick={() =>
-                          setWalletAmount(String(amount))
-                        }
-                        disabled={walletLoading || exceedsBalance}
-                        title={
-                          exceedsBalance
-                            ? "This amount exceeds your available balance."
-                            : undefined
-                        }
-                      >
-                        ${amount}
-                      </button>
-                    );
-                  })}
-
-                  {walletTab === "withdraw" && (
-                    <button
-                      type="button"
-                      className={
-                        Number(walletAmount || 0) === Number(balance.toFixed(2))
-                          ? "active wallet-max-button"
-                          : "wallet-max-button"
-                      }
-                      onClick={() =>
-                        setWalletAmount(balance.toFixed(2))
-                      }
-                      disabled={walletLoading || balance <= 0}
-                    >
-                      Max ${balance.toFixed(2)}
-                    </button>
-                  )}
-                </div>
-
-                <label className="wallet-input-wrap wallet-input-premium">
-                  <span>Amount</span>
-
-                  <div>
-                    <span>$</span>
-
-                    <input
-                      type="number"
-                      min="0.01"
-                      step="0.01"
-                      value={walletAmount}
-                      onChange={(event) =>
-                        setWalletAmount(event.target.value)
-                      }
-                      placeholder="0.00"
-                      disabled={walletLoading}
-                    />
-                  </div>
-                </label>
-
-                {walletTab === "withdraw" &&
-                  Number(walletAmount || 0) > balance && (
-                    <div className="wallet-inline-warning">
-                      The amount is greater than your available balance.
+                {walletAction === "deposit" && cryptoPayment ? (
+                  <div
+                    style={{
+                      border: "1px solid rgba(255,255,255,0.10)",
+                      borderRadius: 18,
+                      padding: 18,
+                      background: "rgba(255,255,255,0.025)",
+                    }}
+                  >
+                    <div className="eyebrow">CRYPTO DEPOSIT</div>
+                    <h3 style={{ margin: "6px 0 4px" }}>Send your payment</h3>
+                    <p style={{ margin: "0 0 14px", opacity: 0.72, lineHeight: 1.5 }}>
+                      Send exactly the amount shown below on this network.
+                    </p>
+                    <div style={{ display: "grid", placeItems: "center", padding: 14, borderRadius: 14, background: "#fff", width: "fit-content", margin: "0 auto 14px" }}>
+                      <img
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(cryptoPayment.payAddress || "")}`}
+                        alt="Crypto deposit QR code"
+                        width="220"
+                        height="220"
+                        style={{ display: "block" }}
+                      />
                     </div>
-                  )}
+                    <div style={{ marginBottom: 10 }}>
+                      <small style={{ opacity: 0.62 }}>NETWORK</small>
+                      <strong style={{ display: "block", marginTop: 3 }}>
+                        {cryptoPayment.payCurrencyLabel || cryptoPayment.network}
+                      </strong>
+                    </div>
+                    <div style={{ marginBottom: 10 }}>
+                      <small style={{ opacity: 0.62 }}>AMOUNT TO SEND</small>
+                      <strong style={{ display: "block", marginTop: 3, fontSize: 22 }}>
+                        {cryptoPayment.payAmount} {String(cryptoPayment.payCurrency || "").toUpperCase()}
+                      </strong>
+                    </div>
+                    <div style={{ marginBottom: 12 }}>
+                      <small style={{ opacity: 0.62 }}>DEPOSIT ADDRESS</small>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 5, padding: "10px 11px", borderRadius: 10, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                        <code style={{ flex: 1, overflowWrap: "anywhere", fontSize: 12 }}>
+                          {truncateAddress(cryptoPayment.payAddress, 34)}
+                        </code>
+                        <button type="button" className="secondary" onClick={copyCryptoAddress}>Copy</button>
+                      </div>
+                    </div>
+                    <div style={{ padding: "10px 12px", borderRadius: 10, background: cryptoPayment.status === "completed" ? "rgba(60, 220, 150, 0.10)" : cryptoPayment.status === "failed" || cryptoPayment.status === "expired" ? "rgba(255, 80, 100, 0.10)" : "rgba(140, 100, 255, 0.10)" }}>
+                      <strong>
+                        {cryptoPayment.status === "completed" ? "Payment confirmed" : cryptoPayment.status === "failed" ? "Payment failed" : cryptoPayment.status === "expired" ? "Payment expired" : "Waiting for payment…"}
+                      </strong>
+                    </div>
+                    <button type="button" className="primary wide" style={{ marginTop: 12 }} onClick={closeCryptoPayment}>
+                      {cryptoPayment.status === "completed" ? "Done" : "Close"}
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    {walletAction === "deposit" && (
+                      <label className="wallet-input-wrap wallet-input-premium" style={{ marginBottom: 12 }}>
+                        <span>Crypto network</span>
+                        <div>
+                          <select value={depositCurrency} onChange={(event) => setDepositCurrency(event.target.value)} disabled={walletLoading} style={{ width: "100%", background: "transparent", border: 0, outline: 0, color: "inherit", font: "inherit", cursor: walletLoading ? "not-allowed" : "pointer" }}>
+                            {CRYPTO_DEPOSIT_OPTIONS.map((option) => (
+                              <option key={option.code} value={option.code}>{option.label}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </label>
+                    )}
 
-                <button
-                  className="primary wide wallet-primary-action"
-                  onClick={handleWalletAction}
-                  disabled={
-                    walletLoading ||
-                    !Number.isFinite(Number(walletAmount)) ||
-                    Number(walletAmount) <= 0 ||
-                    (walletTab === "withdraw" &&
-                      Number(walletAmount) > balance)
-                  }
-                >
-                  {walletLoading
-                    ? "Processing..."
-                    : walletTab === "withdraw"
-                    ? `Withdraw${Number(walletAmount) > 0 ? ` $${Number(walletAmount).toFixed(2)}` : ""}`
-                    : "Deposit funds"}
-                  <span>→</span>
-                </button>
+                    <div className="wallet-action-heading">
+                      <div>
+                        <strong>{walletTab === "withdraw" ? "Withdraw funds" : "Add money to your wallet"}</strong>
+                        <span>{walletTab === "withdraw" ? "Choose an amount to withdraw from your available balance." : "Choose a crypto network and amount for your deposit."}</span>
+                      </div>
+                      {walletTab === "withdraw" && (
+                        <b className="wallet-withdraw-available">Available: ${balance.toFixed(2)}</b>
+                      )}
+                    </div>
 
-                <div className="wallet-action-note">
-                  <span className="wallet-note-icon">i</span>
-                  <p>
-                    {walletTab === "withdraw"
-                      ? "Withdrawals use your available wallet balance."
-                      : "This local demo credits deposits immediately. Production payments should be credited only after verified provider confirmation."}
-                  </p>
-                </div>
+                    <div className="wallet-quick-amounts">
+                      {walletQuickAmounts.map((amount) => {
+                        const exceedsBalance = walletTab === "withdraw" && amount > balance;
+                        return (
+                          <button key={amount} type="button" className={Number(walletAmount) === amount ? "active" : ""} onClick={() => setWalletAmount(String(amount))} disabled={walletLoading || exceedsBalance}>
+                            ${amount}
+                          </button>
+                        );
+                      })}
+                      {walletTab === "withdraw" && (
+                        <button type="button" className="wallet-max-button" onClick={() => setWalletAmount(balance.toFixed(2))} disabled={walletLoading || balance <= 0}>
+                          Max ${balance.toFixed(2)}
+                        </button>
+                      )}
+                    </div>
+
+                    <label className="wallet-input-wrap wallet-input-premium">
+                      <span>Amount</span>
+                      <div>
+                        <span>$</span>
+                        <input type="number" min="0.01" step="0.01" value={walletAmount} onChange={(event) => setWalletAmount(event.target.value)} placeholder="0.00" disabled={walletLoading} />
+                      </div>
+                    </label>
+
+                    {walletTab === "withdraw" && Number(walletAmount || 0) > balance && (
+                      <div className="wallet-inline-warning">The amount is greater than your available balance.</div>
+                    )}
+
+                    <button className="primary wide wallet-primary-action" onClick={handleWalletAction} disabled={walletLoading || !Number.isFinite(Number(walletAmount)) || Number(walletAmount) <= 0 || (walletTab === "withdraw" && Number(walletAmount) > balance)}>
+                      {walletLoading ? "Processing..." : walletTab === "withdraw" ? `Withdraw${Number(walletAmount) > 0 ? ` $${Number(walletAmount).toFixed(2)}` : ""}` : "Create crypto deposit"}
+                      <span>→</span>
+                    </button>
+
+                    <div className="wallet-action-note">
+                      <span className="wallet-note-icon">i</span>
+                      <p>{walletTab === "withdraw" ? "Withdrawals will use your available wallet balance." : "Your balance is credited only after NOWPayments confirms the transaction."}</p>
+                    </div>
+                  </>
+                )}
               </>
-            ) : (
+) : (
               <div className="wallet-history wallet-history-full wallet-history-premium">
                 {(() => {
                   const walletHistory = transactions.filter(
