@@ -344,6 +344,7 @@ function App() {
   const [result, setResult] = useState(null);
   const [wonInventoryId, setWonInventoryId] = useState(null);
   const [reelItems, setReelItems] = useState([]);
+  const [reelWinningReward, setReelWinningReward] = useState(null);
   const [loading, setLoading] = useState(true);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [reelTarget, setReelTarget] = useState(null);
@@ -1186,6 +1187,7 @@ function App() {
     setResult(null);
     setWonInventoryId(null);
     setReelItems([]);
+    setReelWinningReward(null);
     setReelTarget(null);
     setReelAnimating(false);
 
@@ -1219,6 +1221,63 @@ function App() {
     } finally {
       setPreviewLoading(false);
     }
+  };
+
+  const buildPendingReel = (rewardPool) => {
+    const pool = (rewardPool || []).map((item) => ({
+      id: Number(item.id),
+      name: item.name,
+      rarity: item.rarity,
+      valueCents: Number(
+        item.value_cents ??
+          item.valueCents ??
+          0
+      ),
+      cls: rarityClass(item.rarity),
+    }));
+
+    const fallbackPool = [
+      { id: 1, name: "Common Drop", rarity: "Common", valueCents: 100, cls: "common" },
+      { id: 2, name: "Rare Drop", rarity: "Rare", valueCents: 300, cls: "rare" },
+      { id: 3, name: "Epic Drop", rarity: "Epic", valueCents: 1000, cls: "epic" },
+      { id: 4, name: "Legendary Drop", rarity: "Legendary", valueCents: 5000, cls: "legendary" },
+      { id: 5, name: "Secret Drop", rarity: "Secret", valueCents: 25000, cls: "secret" },
+    ];
+
+    const source = pool.length ? pool : fallbackPool;
+    const winnerIndex = 120;
+    const itemsAfterWinner = 50;
+    const items = [];
+
+    for (let index = 0; index < winnerIndex; index += 1) {
+      const item = source[Math.floor(Math.random() * source.length)];
+      items.push({
+        ...item,
+        key: `pending-${index}-${item.id}-${Math.random().toString(36).slice(2)}`,
+        winning: false,
+      });
+    }
+
+    items.push({
+      id: 0,
+      name: "Revealing...",
+      rarity: "Common",
+      valueCents: 0,
+      cls: "common",
+      key: "winning-item",
+      winning: true,
+    });
+
+    for (let index = 0; index < itemsAfterWinner; index += 1) {
+      const item = source[Math.floor(Math.random() * source.length)];
+      items.push({
+        ...item,
+        key: `pending-after-${index}-${item.id}-${Math.random().toString(36).slice(2)}`,
+        winning: false,
+      });
+    }
+
+    return items;
   };
 
   const buildReel = (reward, rewardPool) => {
@@ -1528,24 +1587,19 @@ function App() {
     }
 
     setResult(null);
+    setReelWinningReward(null);
     setOpening(true);
-    setReelItems([]);
     setReelTarget(null);
+    setReelAnimating(false);
 
     primeAudio();
     playCaseOpenSound();
     startReelSound();
 
+    const openingStartedAt = Date.now();
+
     try {
-      /*
-       * The case preview already loads the case rewards into
-       * selected.items. Reuse them here instead of making a
-       * second GET request during the click-to-open flow.
-       *
-       * That removes one full Render + Neon round trip from
-       * the critical path before the roulette can begin.
-       */
-      let rewardPool = Array.isArray(c.items)
+      const rewardPool = Array.isArray(c.items)
         ? c.items
         : caseRewardsCacheRef.current.get(Number(c.id)) || [];
 
@@ -1554,6 +1608,13 @@ function App() {
           "Case rewards are still loading. Please open the case again in a moment."
         );
       }
+
+      /*
+       * Start the visual reel immediately. The server still
+       * selects the real reward; the center slot is replaced
+       * with the server-selected reward when /open responds.
+       */
+      setReelItems(buildPendingReel(rewardPool));
 
       const response = await apiFetch(
         `${API}/api/cases/${c.id}/open`,
@@ -1609,24 +1670,23 @@ function App() {
         return next;
       });
 
-      setReelItems(
-        buildReel(
-          data.reward,
-          rewardPool
-        )
-      );
-
       /*
-       * Start the roulette immediately after the opening API
-       * responds. Inventory/activity are refreshed in the
-       * background so they no longer block the animation.
+       * Keep the reel DOM stable while it is moving. Only the
+       * data displayed in the winning slot changes, so the CSS
+       * animation does not restart when the API responds.
        */
+      setReelWinningReward(data.reward);
+
+      const elapsed = Date.now() - openingStartedAt;
+      const revealDelay = Math.max(0, 5800 - elapsed);
+
       window.setTimeout(() => {
         setResult(data.reward);
         setOpening(false);
+        setReelWinningReward(null);
         setReelTarget(null);
         setReelAnimating(false);
-      }, 5800);
+      }, revealDelay);
 
       void Promise.all([
         loadInventory(),
@@ -1645,6 +1705,7 @@ function App() {
 
       setOpening(false);
       setReelItems([]);
+      setReelWinningReward(null);
       setReelTarget(null);
       setReelAnimating(false);
 
@@ -1708,6 +1769,7 @@ function App() {
     setResult(null);
     setWonInventoryId(null);
     setReelItems([]);
+    setReelWinningReward(null);
     setReelTarget(null);
   };
 
@@ -4125,40 +4187,64 @@ function App() {
                       (
                         item,
                         index
-                      ) => (
-                        <div
-                          className={`reel-item ${item.cls}`}
-                          data-winning={
-                            item.winning
-                              ? "true"
-                              : "false"
-                          }
-                          key={`${item.key}-${index}`}
-                        >
-                          <span className="reel-gem">
-                            <ItemArt
-                              rarity={
-                                item.rarity
+                      ) => {
+                        const displayItem =
+                          item.winning &&
+                          reelWinningReward
+                            ? {
+                                ...item,
+                                id: Number(
+                                  reelWinningReward.id
+                                ),
+                                name:
+                                  reelWinningReward.name,
+                                rarity:
+                                  reelWinningReward.rarity,
+                                valueCents: Number(
+                                  reelWinningReward.valueCents ||
+                                    0
+                                ),
+                                cls: rarityClass(
+                                  reelWinningReward.rarity
+                                ),
                               }
-                              compact
-                            />
-                          </span>
+                            : item;
 
-                          <strong>
-                            {item.name}
-                          </strong>
+                        return (
+                          <div
+                            className={`reel-item ${displayItem.cls}`}
+                            data-winning={
+                              displayItem.winning
+                                ? "true"
+                                : "false"
+                            }
+                            key={`${displayItem.key}-${index}`}
+                          >
+                            <span className="reel-gem">
+                              <ItemArt
+                                rarity={
+                                  displayItem.rarity
+                                }
+                                compact
+                              />
+                            </span>
 
-                          <small>
-                            $
-                            {(
-                              Number(
-                                item.valueCents ||
-                                  0
-                              ) / 100
-                            ).toFixed(2)}
-                          </small>
-                        </div>
-                      )
+                            <strong>
+                              {displayItem.name}
+                            </strong>
+
+                            <small>
+                              $
+                              {(
+                                Number(
+                                  displayItem.valueCents ||
+                                    0
+                                ) / 100
+                              ).toFixed(2)}
+                            </small>
+                          </div>
+                        );
+                      }
                     )}
                   </div>
                 </div>
