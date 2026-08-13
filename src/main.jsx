@@ -361,6 +361,8 @@ function App() {
   const [walletLoading, setWalletLoading] = useState(false);
   const [walletTab, setWalletTab] = useState("wallet");
   const [depositCurrency, setDepositCurrency] = useState("USDTTRC20");
+  const [withdrawCurrency, setWithdrawCurrency] = useState("USDTTRC20");
+  const [withdrawAddress, setWithdrawAddress] = useState("");
   const [cryptoPayment, setCryptoPayment] = useState(null);
   const [selected, setSelected] = useState(null);
   const [opening, setOpening] = useState(false);
@@ -1464,6 +1466,11 @@ function App() {
       return;
     }
 
+    if (walletAction === "withdraw" && !String(withdrawAddress || "").trim()) {
+      alert("Enter the crypto wallet address for the withdrawal.");
+      return;
+    }
+
     setWalletLoading(true);
 
     try {
@@ -1478,7 +1485,10 @@ function App() {
             amountCents: Math.round(amount * 100),
             ...(walletAction === "deposit"
               ? { payCurrency: depositCurrency }
-              : {}),
+              : {
+                  payCurrency: withdrawCurrency,
+                  withdrawalAddress: String(withdrawAddress || "").trim(),
+                }),
           }),
         }
       );
@@ -1499,6 +1509,10 @@ if (!response.ok) {
 
       setTransactions(data.transactions || []);
       setWalletAmount("");
+
+      if (walletAction === "withdraw") {
+        setWithdrawAddress("");
+      }
 
       if (walletAction === "deposit" && data.payment?.paymentId) {
         setCryptoPayment({
@@ -3931,12 +3945,49 @@ if (!response.ok) {
                     <div className="wallet-action-heading">
                       <div>
                         <strong>{walletTab === "withdraw" ? "Withdraw funds" : "Add money to your wallet"}</strong>
-                        <span>{walletTab === "withdraw" ? "Choose an amount to withdraw from your available balance." : "Choose a crypto network and amount for your deposit."}</span>
+                        <span>{walletTab === "withdraw" ? "Choose a crypto network, wallet address and amount to withdraw." : "Choose a crypto network and amount for your deposit."}</span>
                       </div>
                       {walletTab === "withdraw" && (
                         <b className="wallet-withdraw-available">Available: ${balance.toFixed(2)}</b>
                       )}
                     </div>
+
+                    {walletTab === "withdraw" && (
+                      <>
+                        <label className="wallet-input-wrap wallet-input-premium" style={{ marginBottom: 12 }}>
+                          <span>Crypto network</span>
+                          <div>
+                            <select
+                              value={withdrawCurrency}
+                              onChange={(event) => setWithdrawCurrency(event.target.value)}
+                              disabled={walletLoading}
+                              style={{ width: "100%", background: "transparent", border: 0, outline: 0, color: "inherit", font: "inherit", cursor: walletLoading ? "not-allowed" : "pointer" }}
+                            >
+                              {CRYPTO_DEPOSIT_OPTIONS.map((option) => (
+                                <option key={option.code} value={option.code}>
+                                  {option.label}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </label>
+
+                        <label className="wallet-input-wrap wallet-input-premium" style={{ marginBottom: 12 }}>
+                          <span>Withdrawal wallet address</span>
+                          <div>
+                            <input
+                              type="text"
+                              value={withdrawAddress}
+                              onChange={(event) => setWithdrawAddress(event.target.value)}
+                              placeholder="Enter your receiving wallet address"
+                              disabled={walletLoading}
+                              autoComplete="off"
+                              spellCheck="false"
+                            />
+                          </div>
+                        </label>
+                      </>
+                    )}
 
                     <div className="wallet-quick-amounts">
                       {walletQuickAmounts.map((amount) => {
@@ -3966,7 +4017,7 @@ if (!response.ok) {
                       <div className="wallet-inline-warning">The amount is greater than your available balance.</div>
                     )}
 
-                    <button className="primary wide wallet-primary-action" onClick={handleWalletAction} disabled={walletLoading || !Number.isFinite(Number(walletAmount)) || Number(walletAmount) <= 0 || (walletTab === "withdraw" && Number(walletAmount) > balance)}>
+                    <button className="primary wide wallet-primary-action" onClick={handleWalletAction} disabled={walletLoading || !Number.isFinite(Number(walletAmount)) || Number(walletAmount) <= 0 || (walletTab === "withdraw" && (Number(walletAmount) > balance || !String(withdrawAddress || "").trim()))}>
                       {walletLoading ? "Processing..." : walletTab === "withdraw" ? `Withdraw${Number(walletAmount) > 0 ? ` $${Number(walletAmount).toFixed(2)}` : ""}` : "Create crypto deposit"}
                       <span>→</span>
                     </button>
