@@ -331,6 +331,8 @@ function App() {
   const [recentWins, setRecentWins] = useState([]);
   const [liveActivity, setLiveActivity] = useState([]);
   const [liveActivityLoading, setLiveActivityLoading] = useState(true);
+  const liveActivityRequestRef = useRef(false);
+  const caseRewardsCacheRef = useRef(new Map());
   const [transactions, setTransactions] = useState([]);
   const [walletOpen, setWalletOpen] = useState(false);
   const [walletAmount, setWalletAmount] = useState("");
@@ -747,6 +749,12 @@ function App() {
   };
 
   const loadLiveActivity = async () => {
+    if (liveActivityRequestRef.current) {
+      return;
+    }
+
+    liveActivityRequestRef.current = true;
+
     try {
       const response = await apiFetch(
         `${API}/api/users/activity/recent?limit=12`
@@ -761,6 +769,7 @@ function App() {
     } catch (error) {
       console.error("Live activity load failed:", error);
     } finally {
+      liveActivityRequestRef.current = false;
       setLiveActivityLoading(false);
     }
   };
@@ -831,7 +840,7 @@ function App() {
   useEffect(() => {
     const interval = window.setInterval(() => {
       loadLiveActivity();
-    }, 3000);
+    }, 10000);
 
     return () => window.clearInterval(interval);
   }, []);
@@ -1193,9 +1202,16 @@ function App() {
         );
       }
 
+      const rewards = data.items || [];
+
+      caseRewardsCacheRef.current.set(
+        Number(c.id),
+        rewards
+      );
+
       setSelected({
         ...c,
-        items: data.items || [],
+        items: rewards,
       });
     } catch (error) {
       console.error("Case preview failed:", error);
@@ -1531,34 +1547,18 @@ function App() {
        */
       let rewardPool = Array.isArray(c.items)
         ? c.items
-        : [];
+        : caseRewardsCacheRef.current.get(Number(c.id)) || [];
 
       if (!rewardPool.length) {
-        const caseResponse = await apiFetch(
-          `${API}/api/cases/${c.id}`
+        throw new Error(
+          "Case rewards are still loading. Please open the case again in a moment."
         );
-
-        const caseData =
-          await caseResponse.json();
-
-        if (!caseResponse.ok) {
-          throw new Error(
-            caseData.error ||
-              "Failed to load case rewards"
-          );
-        }
-
-        rewardPool = caseData.items || [];
       }
 
       const response = await apiFetch(
         `${API}/api/cases/${c.id}/open`,
         {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({}),
         }
       );
 
