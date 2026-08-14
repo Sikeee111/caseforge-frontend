@@ -4399,6 +4399,18 @@ if (!response.ok) {
                                   reelWinningReward.valueCents ||
                                     0
                                 ),
+                                imageUrl:
+                                  reelWinningReward.image_url ||
+                                  reelWinningReward.imageUrl ||
+                                  item.imageUrl ||
+                                  item.image_url ||
+                                  "",
+                                image_url:
+                                  reelWinningReward.image_url ||
+                                  reelWinningReward.imageUrl ||
+                                  item.imageUrl ||
+                                  item.image_url ||
+                                  "",
                                 cls: rarityClass(
                                   reelWinningReward.rarity
                                 ),
