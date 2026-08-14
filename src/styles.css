@@ -12381,3 +12381,29 @@ body{
   opacity: 0.6;
   cursor: not-allowed;
 }
+
+.admin-payment-details {
+  min-width: 220px;
+}
+
+.admin-payment-details > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.admin-payment-details strong {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.admin-payment-details small {
+  display: block;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #8f8ca0;
+  font-family: monospace;
+  font-size: 11px;
+}
