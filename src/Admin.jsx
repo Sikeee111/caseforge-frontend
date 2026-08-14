@@ -26,6 +26,70 @@ const rarityClass = (rarity) =>
 const money = (cents) =>
   `$${(Number(cents || 0) / 100).toFixed(2)}`;
 
+const getPaymentDetails = (payment) => {
+  const note = String(payment?.note || "").trim();
+
+  let parsed = null;
+
+  if (note) {
+    try {
+      const candidate = JSON.parse(note);
+
+      if (
+        candidate &&
+        typeof candidate === "object" &&
+        !Array.isArray(candidate)
+      ) {
+        parsed = candidate;
+      }
+    } catch {
+      parsed = null;
+    }
+  }
+
+  const network =
+    parsed?.network ||
+    parsed?.withdrawNetwork ||
+    parsed?.currencyNetwork ||
+    parsed?.payCurrency ||
+    parsed?.currency ||
+    null;
+
+  const address =
+    parsed?.address ||
+    parsed?.walletAddress ||
+    parsed?.withdrawAddress ||
+    parsed?.withdrawalAddress ||
+    parsed?.receivingAddress ||
+    null;
+
+  const networkFromText =
+    note.match(
+      /(?:network|currency|crypto network)\s*[:=\-]\s*([^,;|]+)/i
+    )?.[1]?.trim() || null;
+
+  const addressFromText =
+    note.match(
+      /(?:wallet address|withdrawal address|withdraw address|receiving address|address)\s*[:=]\s*([A-Za-z0-9_-]{20,120})/i
+    )?.[1]?.trim() || null;
+
+  const trc20Address =
+    note.match(/T[1-9A-HJ-NP-Za-km-z]{33}/)?.[0] || null;
+
+  return {
+    network:
+      network ||
+      networkFromText ||
+      (note.match(/USDT\s*[-·]\s*TRC[- ]?20/i)?.[0] || null),
+    address:
+      address ||
+      addressFromText ||
+      trc20Address ||
+      null,
+    rawNote: note,
+  };
+};
+
 const rarityIcon = (rarity) =>
   rarity === "Secret"
     ? "☄"
@@ -2930,6 +2994,7 @@ function Admin() {
                       <th>User</th>
                       <th>Type</th>
                       <th>Amount</th>
+                      <th>Destination</th>
                       <th>Status</th>
                       <th>Date</th>
                       <th>Action</th>
@@ -2938,7 +3003,7 @@ function Admin() {
                   <tbody>
                     {adminPayments.length === 0 ? (
                       <tr>
-                        <td colSpan="7" className="admin-table-empty">No payment requests found.</td>
+                        <td colSpan="8" className="admin-table-empty">No payment requests found.</td>
                       </tr>
                     ) : (
                       adminPayments.map((payment) => (
@@ -2952,6 +3017,51 @@ function Admin() {
                             {payment.direction === "deposit" ? "Deposit" : "Withdrawal"}
                           </td>
                           <td className="admin-table-money">{money(payment.amount_cents)}</td>
+                          <td className="admin-payment-details-cell">
+                            {payment.direction === "withdrawal" ? (
+                              (() => {
+                                const details = getPaymentDetails(payment);
+
+                                return (
+                                  <div
+                                    style={{
+                                      minWidth: "220px",
+                                      maxWidth: "280px",
+                                    }}
+                                  >
+                                    <div
+                                      style={{
+                                        fontSize: "12px",
+                                        fontWeight: 700,
+                                        marginBottom: "4px",
+                                      }}
+                                    >
+                                      {details.network || "Network unavailable"}
+                                    </div>
+
+                                    <div
+                                      title={details.address || details.rawNote || ""}
+                                      style={{
+                                        fontFamily: "monospace",
+                                        fontSize: "11px",
+                                        color: "#8f8ca0",
+                                        maxWidth: "280px",
+                                        overflow: "hidden",
+                                        textOverflow: "ellipsis",
+                                        whiteSpace: "nowrap",
+                                      }}
+                                    >
+                                      {details.address ||
+                                        details.rawNote ||
+                                        "Wallet address unavailable"}
+                                    </div>
+                                  </div>
+                                );
+                              })()
+                            ) : (
+                              <span className="admin-table-muted">—</span>
+                            )}
+                          </td>
                           <td>
                             <span className={`admin-payment-status ${payment.status}`}>
                               {payment.status}
