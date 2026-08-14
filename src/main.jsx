@@ -47,8 +47,6 @@ function ItemArt({ rarity = "Common", imageUrl = "", compact = false, large = fa
         draggable="false"
         onError={() => setImageFailed(true)}
         style={{
-          width: "100%",
-          height: "100%",
           objectFit: "contain",
           display: "block",
         }}
@@ -1776,16 +1774,37 @@ if (!response.ok) {
         data.inventoryId ?? null
       );
 
+      const rewardPoolMatch = rewardPool.find(
+        (item) => Number(item.id) === Number(data.reward?.id)
+      );
+
+      const resolvedRewardImage =
+        data.reward?.image_url ||
+        data.reward?.imageUrl ||
+        rewardPoolMatch?.image_url ||
+        rewardPoolMatch?.imageUrl ||
+        "";
+
+      const resolvedReward = {
+        ...data.reward,
+        valueCents: Number(
+          data.reward?.valueCents ||
+            data.reward?.value_cents ||
+            0
+        ),
+        image_url: resolvedRewardImage,
+        imageUrl: resolvedRewardImage,
+      };
+
       const newWin = {
         inventoryId:
           data.inventoryId ?? null,
-        id: data.reward.id,
-        name: data.reward.name,
-        rarity: data.reward.rarity,
-        valueCents: Number(
-          data.reward.valueCents || data.reward.value_cents || 0
-        ),
-        image_url: data.reward.image_url || data.reward.imageUrl || "",
+        id: resolvedReward.id,
+        name: resolvedReward.name,
+        rarity: resolvedReward.rarity,
+        valueCents: resolvedReward.valueCents,
+        image_url: resolvedRewardImage,
+        imageUrl: resolvedRewardImage,
         wonAt: new Date().toISOString(),
       };
 
@@ -1812,13 +1831,13 @@ if (!response.ok) {
        * data displayed in the winning slot changes, so the CSS
        * animation does not restart when the API responds.
        */
-      setReelWinningReward(data.reward);
+      setReelWinningReward(resolvedReward);
 
       const elapsed = Date.now() - openingStartedAt;
       const revealDelay = Math.max(0, 5800 - elapsed);
 
       window.setTimeout(() => {
-        setResult(data.reward);
+        setResult(resolvedReward);
         setOpening(false);
         setReelWinningReward(null);
         setReelTarget(null);
@@ -3345,18 +3364,7 @@ if (!response.ok) {
                       </span>
                     </div>
 
-                    <div
-                      className="inventory-art"
-                      style={{
-                        height: "165px",
-                        minHeight: "165px",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        overflow: "hidden",
-                        width: "100%",
-                      }}
-                    >
+                    <div className="inventory-art">
                       <ItemArt
                         rarity={
                           item.rarity
@@ -4389,6 +4397,18 @@ if (!response.ok) {
                                   reelWinningReward.valueCents ||
                                     0
                                 ),
+                                imageUrl:
+                                  reelWinningReward.image_url ||
+                                  reelWinningReward.imageUrl ||
+                                  item.imageUrl ||
+                                  item.image_url ||
+                                  "",
+                                image_url:
+                                  reelWinningReward.image_url ||
+                                  reelWinningReward.imageUrl ||
+                                  item.imageUrl ||
+                                  item.image_url ||
+                                  "",
                                 cls: rarityClass(
                                   reelWinningReward.rarity
                                 ),
