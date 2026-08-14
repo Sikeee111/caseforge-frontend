@@ -27,9 +27,34 @@ const fallbackCases = [
 
 const rarityClass = (rarity) => String(rarity || "Common").toLowerCase();
 
-function ItemArt({ rarity = "Common", compact = false, large = false }) {
+function ItemArt({ rarity = "Common", imageUrl = "", compact = false, large = false }) {
   const cls = `item-art-svg${compact ? " compact" : ""}${large ? " large" : ""}`;
   const tier = String(rarity || "Common");
+  const resolvedImageUrl = String(imageUrl || "").trim();
+  const [imageFailed, setImageFailed] = useState(false);
+
+  useEffect(() => {
+    setImageFailed(false);
+  }, [resolvedImageUrl]);
+
+  if (resolvedImageUrl && !imageFailed) {
+    return (
+      <img
+        className={`${cls} item-art-image`}
+        src={resolvedImageUrl}
+        alt=""
+        aria-hidden="true"
+        draggable="false"
+        onError={() => setImageFailed(true)}
+        style={{
+          width: "100%",
+          height: "100%",
+          objectFit: "contain",
+          display: "block",
+        }}
+      />
+    );
+  }
 
   if (tier === "Secret") {
     return (
@@ -1259,6 +1284,7 @@ function App() {
           item.valueCents ??
           0
       ),
+      imageUrl: item.image_url ?? item.imageUrl ?? "",
       cls: rarityClass(item.rarity),
     }));
 
@@ -1316,6 +1342,7 @@ function App() {
           item.valueCents ??
           0
       ),
+      imageUrl: item.image_url ?? item.imageUrl ?? "",
       cls: rarityClass(item.rarity),
     }));
 
@@ -1391,8 +1418,9 @@ function App() {
       name: reward.name,
       rarity: reward.rarity,
       valueCents: Number(
-        reward.valueCents || 0
+        reward.valueCents || reward.value_cents || 0
       ),
+      imageUrl: reward.image_url ?? reward.imageUrl ?? "",
       cls: rarityClass(reward.rarity),
       key: "winning-item",
       winning: true,
@@ -1755,8 +1783,9 @@ if (!response.ok) {
         name: data.reward.name,
         rarity: data.reward.rarity,
         valueCents: Number(
-          data.reward.valueCents || 0
+          data.reward.valueCents || data.reward.value_cents || 0
         ),
+        image_url: data.reward.image_url || data.reward.imageUrl || "",
         wonAt: new Date().toISOString(),
       };
 
@@ -2804,7 +2833,7 @@ if (!response.ok) {
                     key={`${item.id}-${item.userId}-${index}`}
                   >
                     <span className="recent-win-icon">
-                      <ItemArt rarity={item.rarity} compact />
+                      <ItemArt rarity={item.rarity} imageUrl={item.image_url || item.imageUrl} compact />
                     </span>
 
                     <div>
@@ -3321,6 +3350,9 @@ if (!response.ok) {
                         rarity={
                           item.rarity
                         }
+                        imageUrl={
+                          item.image_url || item.imageUrl
+                        }
                       />
                     </div>
 
@@ -3692,6 +3724,9 @@ if (!response.ok) {
               <ItemArt
                 rarity={
                   sellConfirmItem.rarity
+                }
+                imageUrl={
+                  sellConfirmItem.image_url || sellConfirmItem.imageUrl
                 }
                 large
               />
@@ -4364,6 +4399,10 @@ if (!response.ok) {
                                 rarity={
                                   displayItem.rarity
                                 }
+                                imageUrl={
+                                  displayItem.imageUrl ||
+                                  displayItem.image_url
+                                }
                                 compact
                               />
                             </span>
@@ -4442,6 +4481,9 @@ if (!response.ok) {
                 <ItemArt
                   rarity={
                     result.rarity
+                  }
+                  imageUrl={
+                    result.image_url || result.imageUrl
                   }
                   large
                 />
@@ -4745,6 +4787,9 @@ if (!response.ok) {
                             <ItemArt
                               rarity={
                                 item.rarity
+                              }
+                              imageUrl={
+                                item.image_url || item.imageUrl
                               }
                               compact
                             />
