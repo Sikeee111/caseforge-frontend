@@ -1776,16 +1776,38 @@ if (!response.ok) {
         data.inventoryId ?? null
       );
 
-      const newWin = {
-        inventoryId:
-          data.inventoryId ?? null,
-        id: data.reward.id,
+      const configuredReward =
+        rewardPool.find(
+          (item) =>
+            Number(item.id) === Number(data.reward.id)
+        ) || {};
+
+      // The live backend may not include image_url in the /open response.
+      // Fall back to the image configured on the case reward itself.
+      const rewardWithImage = {
+        ...data.reward,
+        id: Number(data.reward.id),
         name: data.reward.name,
         rarity: data.reward.rarity,
         valueCents: Number(
-          data.reward.valueCents || data.reward.value_cents || 0
+          data.reward.valueCents ??
+            data.reward.value_cents ??
+            configuredReward.valueCents ??
+            configuredReward.value_cents ??
+            0
         ),
-        image_url: data.reward.image_url || data.reward.imageUrl || "",
+        image_url:
+          data.reward.image_url ||
+          data.reward.imageUrl ||
+          configuredReward.image_url ||
+          configuredReward.imageUrl ||
+          "",
+      };
+
+      const newWin = {
+        inventoryId:
+          data.inventoryId ?? null,
+        ...rewardWithImage,
         wonAt: new Date().toISOString(),
       };
 
@@ -1812,13 +1834,13 @@ if (!response.ok) {
        * data displayed in the winning slot changes, so the CSS
        * animation does not restart when the API responds.
        */
-      setReelWinningReward(data.reward);
+      setReelWinningReward(rewardWithImage);
 
       const elapsed = Date.now() - openingStartedAt;
       const revealDelay = Math.max(0, 5800 - elapsed);
 
       window.setTimeout(() => {
-        setResult(data.reward);
+        setResult(rewardWithImage);
         setOpening(false);
         setReelWinningReward(null);
         setReelTarget(null);
