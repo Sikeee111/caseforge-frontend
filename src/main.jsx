@@ -1776,38 +1776,16 @@ if (!response.ok) {
         data.inventoryId ?? null
       );
 
-      const configuredReward =
-        rewardPool.find(
-          (item) =>
-            Number(item.id) === Number(data.reward.id)
-        ) || {};
-
-      // The live backend may not include image_url in the /open response.
-      // Fall back to the image configured on the case reward itself.
-      const rewardWithImage = {
-        ...data.reward,
-        id: Number(data.reward.id),
-        name: data.reward.name,
-        rarity: data.reward.rarity,
-        valueCents: Number(
-          data.reward.valueCents ??
-            data.reward.value_cents ??
-            configuredReward.valueCents ??
-            configuredReward.value_cents ??
-            0
-        ),
-        image_url:
-          data.reward.image_url ||
-          data.reward.imageUrl ||
-          configuredReward.image_url ||
-          configuredReward.imageUrl ||
-          "",
-      };
-
       const newWin = {
         inventoryId:
           data.inventoryId ?? null,
-        ...rewardWithImage,
+        id: data.reward.id,
+        name: data.reward.name,
+        rarity: data.reward.rarity,
+        valueCents: Number(
+          data.reward.valueCents || data.reward.value_cents || 0
+        ),
+        image_url: data.reward.image_url || data.reward.imageUrl || "",
         wonAt: new Date().toISOString(),
       };
 
@@ -1834,13 +1812,13 @@ if (!response.ok) {
        * data displayed in the winning slot changes, so the CSS
        * animation does not restart when the API responds.
        */
-      setReelWinningReward(rewardWithImage);
+      setReelWinningReward(data.reward);
 
       const elapsed = Date.now() - openingStartedAt;
       const revealDelay = Math.max(0, 5800 - elapsed);
 
       window.setTimeout(() => {
-        setResult(rewardWithImage);
+        setResult(data.reward);
         setOpening(false);
         setReelWinningReward(null);
         setReelTarget(null);
@@ -4398,8 +4376,31 @@ if (!response.ok) {
                                   reelWinningReward.rarity,
                                 valueCents: Number(
                                   reelWinningReward.valueCents ||
+                                    reelWinningReward.value_cents ||
                                     0
                                 ),
+                                imageUrl:
+                                  reelWinningReward.image_url ||
+                                  reelWinningReward.imageUrl ||
+                                  item.imageUrl ||
+                                  reelItems.find(
+                                    (reelItem) =>
+                                      Number(reelItem.id) ===
+                                        Number(reelWinningReward.id) &&
+                                      String(reelItem.imageUrl || "").trim()
+                                  )?.imageUrl ||
+                                  "",
+                                image_url:
+                                  reelWinningReward.image_url ||
+                                  reelWinningReward.imageUrl ||
+                                  item.image_url ||
+                                  reelItems.find(
+                                    (reelItem) =>
+                                      Number(reelItem.id) ===
+                                        Number(reelWinningReward.id) &&
+                                      String(reelItem.imageUrl || "").trim()
+                                  )?.imageUrl ||
+                                  "",
                                 cls: rarityClass(
                                   reelWinningReward.rarity
                                 ),
