@@ -163,6 +163,10 @@ function Admin() {
   const [analytics, setAnalytics] = useState(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [adminView, setAdminView] = useState("activity");
+  const [assetSearch, setAssetSearch] = useState("");
+  const [assetRarity, setAssetRarity] = useState("all");
+  const [showEditAsset, setShowEditAsset] = useState(false);
+  const [editingAsset, setEditingAsset] = useState(null);
   const [adminUsers, setAdminUsers] = useState([]);
   const [adminUsersLoading, setAdminUsersLoading] = useState(false);
   const [adminUsersSearch, setAdminUsersSearch] = useState("");
@@ -1305,82 +1309,27 @@ function Admin() {
   |--------------------------------------------------------------------------
   */
 
- const saveReward = async (item) => {
-  if (!selectedCase) return;
-
-  const probability = Number(item.probability);
-
-  if (
-    !Number.isFinite(probability) ||
-    probability < 0 ||
-    probability > 100
-  ) {
-    setError(`Invalid odds for ${item.name}.`);
-    return;
-  }
-
-  try {
-    setSaving(true);
-    setError("");
-    setSuccess("");
-
-    // Save item information, including image URL
-    const itemResponse = await apiFetch(
-      `${API}/api/admin/items/${item.id}`,
-      {
-        method: "PUT",
-        body: JSON.stringify({
-          name: item.name,
-          rarity: item.rarity,
-          valueCents: Number(item.value_cents),
-          imageUrl: item.image_url || null,
-        }),
-      }
-    );
-
-    const itemData = await itemResponse.json();
-
-    if (!itemResponse.ok) {
-      throw new Error(
-        itemData.error || "Failed to save item"
-      );
+  const saveReward = async (item) => {
+    if (!selectedCase) return;
+    const probability = Number(item.probability);
+    if (!Number.isFinite(probability) || probability < 0 || probability > 100) {
+      setError(`Invalid odds for ${item.name}.`);
+      return;
     }
-
-    // Save the odds for this case
-    const oddsResponse = await apiFetch(
-      `${API}/api/admin/case-items`,
-      {
+    try {
+      setSaving(true); setError(""); setSuccess("");
+      const response = await apiFetch(`${API}/api/admin/case-items`, {
         method: "POST",
-        body: JSON.stringify({
-          caseId: Number(selectedCase.id),
-          itemId: Number(item.id),
-          probability,
-        }),
-      }
-    );
+        body: JSON.stringify({ caseId: Number(selectedCase.id), itemId: Number(item.id), probability }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || `Failed to save ${item.name}`);
+      await loadCase(selectedCase.id);
+      setSuccess(`${item.name} odds saved successfully.`);
+    } catch (err) { console.error(err); setError(err.message); }
+    finally { setSaving(false); }
+  };
 
-    const oddsData = await oddsResponse.json();
-
-    if (!oddsResponse.ok) {
-      throw new Error(
-        oddsData.error || "Failed to save reward odds"
-      );
-    }
-
-    // Reload the case so the saved image/odds are reflected
-    await loadCase(selectedCase.id);
-
-    // Reload the item list as well
-    await loadItems();
-
-    setSuccess(`${item.name} saved successfully.`);
-  } catch (err) {
-    console.error(err);
-    setError(err.message);
-  } finally {
-    setSaving(false);
-  }
-};
 
   /*
   |--------------------------------------------------------------------------
@@ -1390,94 +1339,28 @@ function Admin() {
 
   const saveAllRewards = async () => {
     if (!selectedCase) return;
-
     if (!oddsValid) {
-      setError(
-        `Odds must total 100%. Current total is ${totalOdds.toFixed(
-          2
-        )}%.`
-      );
+      setError(`Odds must total 100%. Current total is ${totalOdds.toFixed(2)}%.`);
       return;
     }
-
     try {
-      setSaving(true);
-      setError("");
-      setSuccess("");
-
+      setSaving(true); setError(""); setSuccess("");
       for (const item of caseItems) {
-        const probability = Number(
-          item.probability
-        );
-
-        if (
-          !Number.isFinite(probability) ||
-          probability < 0 ||
-          probability > 100
-        ) {
-          throw new Error(
-            `Invalid odds for ${item.name}.`
-          );
-        }
-
-        // Save the reward information, including its image URL.
-        const itemResponse = await apiFetch(
-          `${API}/api/admin/items/${item.id}`,
-          {
-            method: "PUT",
-            body: JSON.stringify({
-              name: item.name,
-              rarity: item.rarity,
-              valueCents: Number(item.value_cents),
-              imageUrl: item.image_url || null,
-            }),
-          }
-        );
-
-        const itemData = await itemResponse.json();
-
-        if (!itemResponse.ok) {
-          throw new Error(
-            itemData.error ||
-              `Failed to save ${item.name}`
-          );
-        }
-
-        // Save the odds for this case.
-        const response = await apiFetch(
-          `${API}/api/admin/case-items`,
-          {
-            method: "POST",
-            body: JSON.stringify({
-              caseId: Number(selectedCase.id),
-              itemId: Number(item.id),
-              probability,
-            }),
-          }
-        );
-
+        const probability = Number(item.probability);
+        if (!Number.isFinite(probability) || probability < 0 || probability > 100) throw new Error(`Invalid odds for ${item.name}.`);
+        const response = await apiFetch(`${API}/api/admin/case-items`, {
+          method: "POST",
+          body: JSON.stringify({ caseId: Number(selectedCase.id), itemId: Number(item.id), probability }),
+        });
         const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(
-            data.error ||
-              `Failed to save ${item.name}`
-          );
-        }
+        if (!response.ok) throw new Error(data.error || `Failed to save ${item.name}`);
       }
-
       await loadCase(selectedCase.id);
-
-      setSuccess(
-        "All reward odds saved successfully."
-      );
-    } catch (err) {
-      console.error(err);
-      setError(err.message);
-    } finally {
-      setSaving(false);
-    }
+      setSuccess("All reward odds saved successfully.");
+    } catch (err) { console.error(err); setError(err.message); }
+    finally { setSaving(false); }
   };
+
 
   /*
   |--------------------------------------------------------------------------
@@ -1673,6 +1556,47 @@ function Admin() {
     } finally {
       setSaving(false);
     }
+  };
+
+  /*
+  |--------------------------------------------------------------------------
+  | Case Assets management
+  |--------------------------------------------------------------------------
+  */
+
+  const filteredAssets = useMemo(() => {
+    const query = assetSearch.trim().toLowerCase();
+    return items.filter((item) => {
+      const matchesSearch = !query || String(item.name || "").toLowerCase().includes(query) || String(item.id || "").includes(query);
+      const matchesRarity = assetRarity === "all" || item.rarity === assetRarity;
+      return matchesSearch && matchesRarity;
+    });
+  }, [items, assetSearch, assetRarity]);
+
+  const openEditAsset = (item) => {
+    setEditingAsset({ id: Number(item.id), name: item.name || "", rarity: item.rarity || "Common", value: (Number(item.value_cents || 0) / 100).toFixed(2), imageUrl: item.image_url || "" });
+    setShowEditAsset(true);
+  };
+
+  const saveAsset = async (event) => {
+    event.preventDefault();
+    if (!editingAsset) return;
+    const value = Number(editingAsset.value);
+    if (!editingAsset.name.trim() || !RARITIES.includes(editingAsset.rarity) || !Number.isFinite(value) || value < 0) { setError("Enter a valid asset name, rarity and value."); return; }
+    try {
+      setSaving(true); setError(""); setSuccess("");
+      const response = await apiFetch(`${API}/api/admin/items/${editingAsset.id}`, {
+        method: "PUT",
+        body: JSON.stringify({ name: editingAsset.name.trim(), rarity: editingAsset.rarity, valueCents: Math.round(value * 100), imageUrl: editingAsset.imageUrl.trim() || null }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Failed to update asset");
+      await loadItems();
+      if (selectedCaseId) await loadCase(selectedCaseId);
+      setShowEditAsset(false); setEditingAsset(null);
+      setSuccess("Case asset updated successfully.");
+    } catch (err) { console.error(err); setError(err.message); }
+    finally { setSaving(false); }
   };
 
   /*
@@ -1894,6 +1818,9 @@ function Admin() {
             </button>
             <button type="button" className="admin-sidebar-item" onClick={() => setAdminView("cases")}>
               <span className="admin-sidebar-icon">♔</span><span>Rewards</span>
+            </button>
+            <button type="button" className={adminView === "assets" ? "admin-sidebar-item active" : "admin-sidebar-item"} onClick={() => setAdminView("assets")}>
+              <span className="admin-sidebar-icon">◆</span><span>Case Assets</span>
             </button>
             <button type="button" className={adminView === "inventory" ? "admin-sidebar-item active" : "admin-sidebar-item"} onClick={() => { setAdminView("inventory"); if (selectedUserId) { loadAdminInventory(selectedUserId); loadAdminInventoryHistory(selectedUserId); } }}>
               <span className="admin-sidebar-icon">▣</span><span>Inventory</span>
@@ -3266,6 +3193,51 @@ function Admin() {
           </section>
         )}
 
+        {adminView === "assets" && (
+          <section className="admin-management-card">
+            <div className="admin-management-head">
+              <div>
+                <div className="admin-eyebrow">MASTER REWARD CATALOG</div>
+                <h2>Case Assets</h2>
+                <p>Manage reusable reward assets that can be placed into any case.</p>
+              </div>
+              <button className="admin-primary-button" onClick={() => { setNewItem({ name: "", rarity: "Common", value: "", imageUrl: "" }); setShowCreateItem(true); }}>+ Add Asset</button>
+            </div>
+            <div className="admin-management-body">
+              <div className="admin-management-toolbar">
+                <div className="admin-search-wrap">
+                  <span>⌕</span>
+                  <input value={assetSearch} onChange={(event) => setAssetSearch(event.target.value)} placeholder="Search assets..." />
+                  {assetSearch && <button type="button" onClick={() => setAssetSearch("")}>×</button>}
+                </div>
+                <select value={assetRarity} onChange={(event) => setAssetRarity(event.target.value)}>
+                  <option value="all">All rarities</option>
+                  {RARITIES.map((rarity) => <option key={rarity} value={rarity}>{rarity}</option>)}
+                </select>
+                <span className="admin-table-muted">{filteredAssets.length} of {items.length} assets</span>
+              </div>
+              <div className="admin-activity-table-wrap">
+                <table className="admin-activity-table">
+                  <thead><tr><th>Asset</th><th>Rarity</th><th>Value</th><th>Asset ID</th><th></th></tr></thead>
+                  <tbody>
+                    {filteredAssets.length === 0 ? (
+                      <tr><td colSpan="5" className="admin-table-empty">No case assets found.</td></tr>
+                    ) : filteredAssets.map((item) => (
+                      <tr key={item.id}>
+                        <td><div style={{ display: "flex", alignItems: "center", gap: "12px" }}><RewardThumbnail item={item} /><div><strong>{item.name}</strong><small>Reusable case reward</small></div></div></td>
+                        <td><span className={rarityClass(item.rarity)}>{item.rarity}</span></td>
+                        <td><strong>{money(item.value_cents)}</strong></td>
+                        <td className="admin-table-muted">#{item.id}</td>
+                        <td><button type="button" className="admin-secondary-button" onClick={() => openEditAsset(item)}>Edit</button></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+        )}
+
         {adminView === "cases" && (
         <div className="admin-layout">
           {/* CASE LIST */}
@@ -3695,20 +3667,7 @@ function Admin() {
                                 overflow: "hidden",
                               }}
                             >
-                              <input
-                                className="admin-reward-inline-input name"
-                                value={item.name || ""}
-                                onChange={(event) => {
-                                  const value = event.target.value;
-                                  setCaseItems((current) =>
-                                    current.map((currentItem) =>
-                                      Number(currentItem.id) === Number(item.id)
-                                        ? { ...currentItem, name: value }
-                                        : currentItem
-                                    )
-                                  );
-                                }}
-                              />
+                              <strong className="admin-reward-inline-input name" style={{ display: "block", padding: "7px 9px" }}>{item.name || "Unnamed asset"}</strong>
 
                               <span>
                                 Item #{item.id}
@@ -3717,24 +3676,7 @@ function Admin() {
                           </div>
 
                           <div>
-                            <select
-                              className={`admin-rarity-select ${rarityClass(item.rarity)}`}
-                              value={item.rarity}
-                              onChange={(event) => {
-                                const value = event.target.value;
-                                setCaseItems((current) =>
-                                  current.map((currentItem) =>
-                                    Number(currentItem.id) === Number(item.id)
-                                      ? { ...currentItem, rarity: value }
-                                      : currentItem
-                                  )
-                                );
-                              }}
-                            >
-                              {RARITIES.map((rarity) => (
-                                <option key={rarity} value={rarity}>{rarity}</option>
-                              ))}
-                            </select>
+                            <span className={`admin-rarity-select ${rarityClass(item.rarity)}`} style={{ display: "inline-flex", alignItems: "center", minHeight: "34px", padding: "0 9px" }}>{item.rarity}</span>
                           </div>
 
                           <div
@@ -3787,59 +3729,10 @@ function Admin() {
                               )}
                             </div>
 
-                            <input
-                              type="url"
-                              placeholder="Paste image URL"
-                              value={item.image_url || ""}
-                              onChange={(event) => {
-                                const value =
-                                  event.target.value;
-
-                                setCaseItems((current) =>
-                                  current.map(
-                                    (currentItem) =>
-                                      Number(
-                                        currentItem.id
-                                      ) ===
-                                      Number(item.id)
-                                        ? {
-                                            ...currentItem,
-                                            image_url:
-                                              value,
-                                          }
-                                        : currentItem
-                                  )
-                                );
-                              }}
-                              style={{
-                                width: "100%",
-                                minWidth: 0,
-                                height: "34px",
-                                padding: "0 9px",
-                                boxSizing: "border-box",
-                              }}
-                            />
+                            <span className="admin-table-muted">{item.image_url ? "Asset image set" : "No image"}</span>
                           </div>
 
-                          <div className="admin-reward-value-input">
-                            <span>$</span>
-                            <input
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              value={(Number(item.value_cents || 0) / 100).toFixed(2)}
-                              onChange={(event) => {
-                                const value = event.target.value;
-                                setCaseItems((current) =>
-                                  current.map((currentItem) =>
-                                    Number(currentItem.id) === Number(item.id)
-                                      ? { ...currentItem, value_cents: Math.round(Number(value || 0) * 100) }
-                                      : currentItem
-                                  )
-                                );
-                              }}
-                            />
-                          </div>
+                          <div className="admin-reward-value-input" style={{ justifyContent: "center", minHeight: "34px" }}><span>{money(item.value_cents)}</span></div>
 
                           <div className="admin-odds-input">
                             <input
@@ -4073,6 +3966,25 @@ function Admin() {
                   ? "Creating..."
                   : "Create Case"}
               </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT CASE ASSET */}
+
+      {showEditAsset && editingAsset && (
+        <div className="admin-modal-backdrop" onClick={() => !saving && setShowEditAsset(false)}>
+          <div className="admin-modal" onClick={(event) => event.stopPropagation()}>
+            <button className="admin-modal-close" onClick={() => !saving && setShowEditAsset(false)}>×</button>
+            <div className="admin-eyebrow">CASE ASSET</div><h2>Edit Asset</h2><p>This master asset can be reused across multiple cases.</p>
+            <form onSubmit={saveAsset} className="admin-modal-form">
+              <label><span>Asset name</span><input autoFocus value={editingAsset.name} onChange={(event) => setEditingAsset((current) => ({ ...current, name: event.target.value }))} /></label>
+              <label><span>Rarity</span><select value={editingAsset.rarity} onChange={(event) => setEditingAsset((current) => ({ ...current, rarity: event.target.value }))}>{RARITIES.map((rarity) => <option key={rarity} value={rarity}>{rarity}</option>)}</select></label>
+              <label><span>Asset value</span><div className="admin-money-input"><b>$</b><input type="number" min="0" step="0.01" value={editingAsset.value} onChange={(event) => setEditingAsset((current) => ({ ...current, value: event.target.value }))} /></div></label>
+              <label><span>Image URL</span><input type="url" value={editingAsset.imageUrl} placeholder="https://example.com/reward.png" onChange={(event) => setEditingAsset((current) => ({ ...current, imageUrl: event.target.value }))} /></label>
+              {editingAsset.imageUrl.trim() && <img src={editingAsset.imageUrl} alt="Asset preview" style={{ width: "72px", height: "72px", objectFit: "contain", borderRadius: "12px" }} />}
+              <button className="admin-primary-button admin-modal-submit" disabled={saving}>{saving ? "Saving..." : "Save Asset"}</button>
             </form>
           </div>
         </div>
