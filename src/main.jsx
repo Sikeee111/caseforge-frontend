@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
-import Admin from "./Admin.jsx";
+import Admin from "./admin.jsx";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:4000";
 
