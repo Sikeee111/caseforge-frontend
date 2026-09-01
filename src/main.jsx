@@ -1848,11 +1848,17 @@ function App() {
     });
   }, [opening, reelItems]);
 
-  const handleWalletAction = async () => {
-    const amount = Number(walletAmount);
+const handleWalletAction = async () => {
+    const amount =
+      walletAction === "withdraw"
+        ? Number(walletAmount)
+        : null;
 
-    if (!Number.isFinite(amount) || amount <= 0) {
-      alert("Enter a valid amount.");
+    if (
+      walletAction === "withdraw" &&
+      (!Number.isFinite(amount) || amount <= 0)
+    ) {
+      alert("Enter a valid withdrawal amount.");
       return;
     }
 
@@ -1864,8 +1870,15 @@ function App() {
     setWalletLoading(true);
 
     try {
-      const response = await apiFetch(
-        `${API}/api/me/wallet/${walletAction}`,
+const response =
+  walletAction === "deposit"
+    ? await apiFetch(
+        `${API}/api/me/wallet/deposit-address?payCurrency=${encodeURIComponent(
+          depositCurrency
+        )}`
+      )
+    : await apiFetch(
+        `${API}/api/me/wallet/withdraw`,
         {
           method: "POST",
           headers: {
@@ -1873,12 +1886,8 @@ function App() {
           },
           body: JSON.stringify({
             amountCents: Math.round(amount * 100),
-            ...(walletAction === "deposit"
-              ? { payCurrency: depositCurrency }
-              : {
-                  payCurrency: withdrawCurrency,
-                  withdrawalAddress: String(withdrawAddress || "").trim(),
-                }),
+            payCurrency: withdrawCurrency,
+            withdrawalAddress: String(withdrawAddress || "").trim(),
           }),
         }
       );
@@ -1893,26 +1902,36 @@ if (!response.ok) {
   );
 }
 
-      setBalance(
-        Number(data.newBalanceCents || 0) / 100
-      );
+if (walletAction === "withdraw") {
+  setBalance(
+    Number(data.newBalanceCents || 0) / 100
+  );
+  setTransactions(data.transactions || []);
+} else {
+  await loadTransactions();
+}
 
-      setTransactions(data.transactions || []);
-      setWalletAmount("");
+setWalletAmount("");
 
       if (walletAction === "withdraw") {
         setWithdrawAddress("");
       }
 
-      if (walletAction === "deposit" && data.payment?.paymentId) {
-        setCryptoPayment({
-          ...data.payment,
-          requestId: data.request?.id || null,
-          status: data.payment.paymentStatus || "waiting",
-        });
-      } else {
-        await loadTransactions();
-      }
+if (walletAction === "deposit" && data.payAddress) {
+  setCryptoPayment({
+    paymentId: data.providerPaymentId || null,
+    requestId: data.requestId || data.request?.id || null,
+    payAddress: data.payAddress,
+    payCurrency: data.payCurrency,
+    network: data.network,
+    minimumUsd: data.minimumUsd,
+    status: "waiting",
+  });
+}
+
+else {
+  await loadTransactions();
+}
     } catch (error) {
       console.error(`Wallet ${walletAction} failed:`, error);
       alert(error.message);
@@ -1935,58 +1954,104 @@ if (!response.ok) {
     setCryptoPayment(null);
   };
 
-  useEffect(() => {
-    if (!cryptoPayment?.requestId) return;
+useEffect(() => {
+  if (!cryptoPayment?.payAddress) return;
 
-    let stopped = false;
-    let timer = null;
+  let stopped = false;
+  let timer = null;
 
-    const checkPayment = async () => {
-      try {
-        const response = await apiFetch(`${API}/api/me/wallet/requests`);
-        if (!response.ok || stopped) return;
+  const checkPayment = async () => {
+    try {
+    const response = await apiFetch(
+  `${API}/api/me/wallet/deposit-status?payAddress=${encodeURIComponent(
+    cryptoPayment.payAddress
+  )}`
+);
 
-        const data = await response.json();
-        const request = (data.requests || []).find(
-          (item) => Number(item.id) === Number(cryptoPayment.requestId)
-        );
-        if (!request || stopped) return;
+if (!response.ok || stopped) return;
 
-        const status = String(request.status || "pending").toLowerCase();
+const data = await response.json();
 
-        setCryptoPayment((current) =>
-          current ? { ...current, status } : current
-        );
+if (!data.found || stopped) return;
 
-        if (status === "completed") {
-          const meResponse = await apiFetch(`${API}/api/auth/me`);
-          if (meResponse.ok) {
-            const meData = await meResponse.json();
-            if (meData.user) {
-              setAuthUser(meData.user);
-              setBalance(Number(meData.user.balance_cents || 0) / 100);
+const status = String(
+  data.status || "waiting"
+).toLowerCase();
+      setCryptoPayment((current) =>
+        current
+          ? {
+              ...current,
+              requestId: data.requestId || null,
+              status,
             }
+          : current
+      );
+
+      if (status === "completed") {
+        const meResponse = await apiFetch(
+          `${API}/api/auth/me`
+        );
+
+        if (meResponse.ok) {
+          const meData = await meResponse.json();
+
+          if (meData.user) {
+            setAuthUser(meData.user);
+            setBalance(
+              Number(
+                meData.user.balance_cents || 0
+              ) / 100
+            );
           }
-          await loadTransactions();
-          if (timer) window.clearInterval(timer);
         }
 
-        if (["failed", "expired", "refunded", "payment_mismatch"].includes(status)) {
-          if (timer) window.clearInterval(timer);
+        await loadTransactions();
+
+        if (timer) {
+          window.clearInterval(timer);
         }
-      } catch (error) {
-        console.error("Crypto payment status check failed:", error);
       }
-    };
 
-    checkPayment();
-    timer = window.setInterval(checkPayment, 4000);
+if (status === "payment_mismatch") {
+  alert(
+    `Deposit was not credited because the amount received is below the minimum deposit of $${Number(
+      data.minimumUsd || cryptoPayment.minimumUsd || 0
+    ).toFixed(2)}.`
+  );
 
-    return () => {
-      stopped = true;
-      if (timer) window.clearInterval(timer);
-    };
-  }, [cryptoPayment?.requestId]);
+  if (timer) {
+    window.clearInterval(timer);
+  }
+
+  return;
+}
+
+if (
+  ["failed", "expired", "refunded"].includes(status)
+) {
+  if (timer) {
+    window.clearInterval(timer);
+  }
+}
+    } catch (error) {
+      console.error(
+        "Crypto payment status check failed:",
+        error
+      );
+    }
+  };
+
+  checkPayment();
+  timer = window.setInterval(checkPayment, 4000);
+
+  return () => {
+    stopped = true;
+
+    if (timer) {
+      window.clearInterval(timer);
+    }
+  };
+}, [cryptoPayment?.payAddress]);
 
   const withdrawItem = async (item) => {
     if (!item || withdrawLoadingId) return;
@@ -5317,9 +5382,9 @@ if (!response.ok) {
                   >
                     <div className="eyebrow">CRYPTO DEPOSIT</div>
                     <h3 style={{ margin: "6px 0 4px" }}>Send your payment</h3>
-                    <p style={{ margin: "0 0 14px", opacity: 0.72, lineHeight: 1.5 }}>
-                      Send exactly the amount shown below on this network.
-                    </p>
+<p style={{ margin: "0 0 14px", opacity: 0.72, lineHeight: 1.5 }}>
+  Send any amount you want to this address. Your balance will be credited with the amount received.
+</p>
                     <div className="wallet-qr-frame" style={{ display: "grid", placeItems: "center", padding: 14, borderRadius: 14, background: "#fff", width: "fit-content", margin: "0 auto 14px" }}>
                       <img
                         src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(cryptoPayment.payAddress || "")}`}
@@ -5329,18 +5394,13 @@ if (!response.ok) {
                         style={{ display: "block" }}
                       />
                     </div>
-                    <div style={{ marginBottom: 10 }}>
-                      <small style={{ opacity: 0.62 }}>NETWORK</small>
-                      <strong style={{ display: "block", marginTop: 3 }}>
-                        {cryptoPayment.payCurrencyLabel || cryptoPayment.network}
-                      </strong>
-                    </div>
-                    <div style={{ marginBottom: 10 }}>
-                      <small style={{ opacity: 0.62 }}>AMOUNT TO SEND</small>
-                      <strong style={{ display: "block", marginTop: 3, fontSize: 22 }}>
-                        {cryptoPayment.payAmount} {String(cryptoPayment.payCurrency || "").toUpperCase()}
-                      </strong>
-                    </div>
+<div style={{ marginBottom: 12 }}>
+  <small style={{ opacity: 0.62 }}>MINIMUM DEPOSIT</small>
+  <strong style={{ display: "block", marginTop: 3, fontSize: 22 }}>
+    ${Number(cryptoPayment.minimumUsd || 0).toFixed(2)} USD
+  </strong>
+</div>
+
                     <div style={{ marginBottom: 12 }}>
                       <small style={{ opacity: 0.62 }}>DEPOSIT ADDRESS</small>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 5, padding: "10px 11px", borderRadius: 10, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
@@ -5377,7 +5437,7 @@ if (!response.ok) {
                     <div className="wallet-action-heading">
                       <div>
                         <strong>{walletTab === "withdraw" ? "Withdraw funds" : "Add money to your wallet"}</strong>
-                        <span>{walletTab === "withdraw" ? "Choose a crypto network, wallet address and amount to withdraw." : "Choose a crypto network and amount for your deposit."}</span>
+                        <span>{walletTab === "withdraw" ? "Choose a crypto network, wallet address and amount to withdraw." : "Choose a crypto network to get your reusable deposit address."}</span>
                       </div>
                       {walletTab === "withdraw" && (
                         <b className="wallet-withdraw-available">Available: ${balance.toFixed(2)}</b>
@@ -5421,29 +5481,53 @@ if (!response.ok) {
                       </>
                     )}
 
-                    <div className="wallet-quick-amounts">
-                      {walletQuickAmounts.map((amount) => {
-                        const exceedsBalance = walletTab === "withdraw" && amount > balance;
-                        return (
-                          <button key={amount} type="button" className={Number(walletAmount) === amount ? "active" : ""} onClick={() => setWalletAmount(String(amount))} disabled={walletLoading || exceedsBalance}>
-                            ${amount}
-                          </button>
-                        );
-                      })}
-                      {walletTab === "withdraw" && (
-                        <button type="button" className="wallet-max-button" onClick={() => setWalletAmount(balance.toFixed(2))} disabled={walletLoading || balance <= 0}>
-                          Max ${balance.toFixed(2)}
-                        </button>
-                      )}
-                    </div>
+{walletTab === "withdraw" && (
+  <div className="wallet-quick-amounts">
+    {walletQuickAmounts.map((amount) => {
+      const exceedsBalance =
+        walletTab === "withdraw" && amount > balance;
 
-                    <label className="wallet-input-wrap wallet-input-premium">
-                      <span>Amount</span>
-                      <div>
-                        <span>$</span>
-                        <input type="number" min="1" step="0.01" value={walletAmount} onChange={(event) => setWalletAmount(event.target.value)} placeholder="0.00" disabled={walletLoading} />
-                      </div>
-                    </label>
+      return (
+        <button
+          key={amount}
+          type="button"
+          className={Number(walletAmount) === amount ? "active" : ""}
+          onClick={() => setWalletAmount(String(amount))}
+          disabled={walletLoading || exceedsBalance}
+        >
+          ${amount}
+        </button>
+      );
+    })}
+
+    <button
+      type="button"
+      className="wallet-max-button"
+      onClick={() => setWalletAmount(balance.toFixed(2))}
+      disabled={walletLoading || balance <= 0}
+    >
+      Max ${balance.toFixed(2)}
+    </button>
+  </div>
+)}
+
+{walletTab === "withdraw" && (
+  <label className="wallet-input-wrap wallet-input-premium">
+    <span>Amount</span>
+    <div>
+      <span>$</span>
+      <input
+        type="number"
+        min="1"
+        step="0.01"
+        value={walletAmount}
+        onChange={(event) => setWalletAmount(event.target.value)}
+        placeholder="0.00"
+        disabled={walletLoading}
+      />
+    </div>
+  </label>
+)}
 
                     {walletAction === "deposit" && (
                       <div
@@ -5485,10 +5569,27 @@ if (!response.ok) {
                       <div className="wallet-inline-warning">The amount is greater than your available balance.</div>
                     )}
 
-                    <button className="primary wide wallet-primary-action" onClick={handleWalletAction} disabled={walletLoading || !Number.isFinite(Number(walletAmount)) || Number(walletAmount) <= 0 || (walletTab === "withdraw" && (Number(walletAmount) > balance || !String(withdrawAddress || "").trim()))}>
-                      {walletLoading ? "Processing..." : walletTab === "withdraw" ? `Withdraw${Number(walletAmount) > 0 ? ` $${Number(walletAmount).toFixed(2)}` : ""}` : "Create crypto deposit"}
-                      <span>→</span>
-                    </button>
+<button
+  className="primary wide wallet-primary-action"
+  onClick={handleWalletAction}
+  disabled={
+    walletLoading ||
+    (walletTab === "withdraw" &&
+      (
+        !Number.isFinite(Number(walletAmount)) ||
+        Number(walletAmount) <= 0 ||
+        Number(walletAmount) > balance ||
+        !String(withdrawAddress || "").trim()
+      ))
+  }
+>
+  {walletLoading
+    ? "Processing..."
+    : walletTab === "withdraw"
+      ? `Withdraw${Number(walletAmount) > 0 ? ` $${Number(walletAmount).toFixed(2)}` : ""}`
+      : "Create crypto deposit"}
+  <span>→</span>
+</button>
 
                     <div className="wallet-action-note">
                       <span className="wallet-note-icon">i</span>
