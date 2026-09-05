@@ -1987,38 +1987,111 @@ setEditingCase({
     }
   };
 
-  const reviewPayment = async (paymentId, action) => {
-    if (!paymentId) return;
-    const label = action === "approve" ? "approve" : "reject";
-    if (!window.confirm(`Are you sure you want to ${label} this payment request?`)) {
-      return;
+const reviewPayment = async (paymentId, action) => {
+  if (!paymentId) return;
+
+  const label =
+    action === "approve"
+      ? "process this withdrawal"
+      : "reject this payment request";
+
+  if (
+    !window.confirm(
+      `Are you sure you want to ${label}?`
+    )
+  ) {
+    return;
+  }
+
+  try {
+    setSaving(true);
+    setError("");
+    setSuccess("");
+
+    const response = await apiFetch(
+      `${API}/api/admin/payments/${paymentId}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({
+          action,
+        }),
+      }
+    );
+
+    const data =
+      await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data.error ||
+          "Payment review failed"
+      );
     }
 
-    try {
-      setSaving(true);
-      setError("");
-      setSuccess("");
-      const response = await apiFetch(`${API}/api/admin/payments/${paymentId}`, {
-        method: "PATCH",
-        body: JSON.stringify({ action }),
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || "Payment review failed");
+    /*
+     * Withdrawal payouts may require
+     * NOWPayments 2FA before CaseX can
+     * mark the withdrawal as completed.
+     */
+    if (
+      action === "approve" &&
+      data.requires2FA
+    ) {
+      const verificationCode =
+        window.prompt(
+          "Enter your NOWPayments 2FA verification code:"
+        );
+
+      if (!verificationCode) {
+        setSuccess(
+          `Payment #${paymentId} payout created. 2FA verification is still required.`
+        );
+        return;
       }
-      setSuccess(`Payment #${paymentId} ${data.status}.`);
-      await Promise.all([
-        loadAdminPayments(),
-        loadAdminActivity(),
-        loadAnalytics(),
-      ]);
-    } catch (err) {
-      console.error(err);
-      setError(err.message);
-    } finally {
-      setSaving(false);
+
+      const verifyResponse =
+        await apiFetch(
+          `${API}/api/admin/payments/${paymentId}/verify`,
+          {
+            method: "POST",
+            body: JSON.stringify({
+              verificationCode:
+                verificationCode.trim(),
+            }),
+          }
+        );
+
+      const verifyData =
+        await verifyResponse.json();
+
+      if (!verifyResponse.ok) {
+        throw new Error(
+          verifyData.error ||
+            "NOWPayments verification failed"
+        );
+      }
+
+      setSuccess(
+        `Payment #${paymentId} withdrawal processed successfully.`
+      );
+    } else {
+      setSuccess(
+        `Payment #${paymentId} ${data.status}.`
+      );
     }
-  };
+
+    await Promise.all([
+      loadAdminPayments(),
+      loadAdminActivity(),
+      loadAnalytics(),
+    ]);
+  } catch (err) {
+    console.error(err);
+    setError(err.message);
+  } finally {
+    setSaving(false);
+  }
+};
 
   const loadAdminItemWithdrawals = async (
     status = adminItemWithdrawalStatus,
