@@ -518,6 +518,11 @@ function Admin() {
   const [adminAccessLoading, setAdminAccessLoading] = useState(true);
   const [adminBootstrapLoading, setAdminBootstrapLoading] = useState(false);
   const [adminPayments, setAdminPayments] = useState([]);
+  const [brainrotDeposits, setBrainrotDeposits] = useState([]);
+  const [brainrotDepositsLoading, setBrainrotDepositsLoading] = useState(false);
+  const [brainrotDepositStatus, setBrainrotDepositStatus] = useState("pending");
+  const [brainrotDepositSearch, setBrainrotDepositSearch] = useState("");
+  const [brainrotDepositDrafts, setBrainrotDepositDrafts] = useState({});
   const [adminPaymentsLoading, setAdminPaymentsLoading] = useState(false);
   const [adminPaymentStatus, setAdminPaymentStatus] = useState("pending");
   const [adminPaymentSearch, setAdminPaymentSearch] = useState("");
@@ -1963,6 +1968,51 @@ setEditingCase({
     }
   };
 
+  const loadAdminBrainrotDeposits = async (status = brainrotDepositStatus, search = brainrotDepositSearch) => {
+    setBrainrotDepositsLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (status && status !== "all") params.set("status", status);
+      if (search.trim()) params.set("search", search.trim());
+      const query = params.toString() ? `?${params.toString()}` : "";
+      const response = await apiFetch(`${API}/api/admin/brainrot-deposits${query}`);
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Failed to load Brainrot deposits");
+      setBrainrotDeposits(data.deposits || []);
+      setBrainrotDepositDrafts((current) => {
+        const next = { ...current };
+        for (const deposit of data.deposits || []) {
+          const id = String(deposit.id);
+          if (!next[id]) next[id] = { amountCents: Number(deposit.amount_cents || 0), itemsDescription: deposit.items_description || "", staffNote: deposit.staff_note || "" };
+        }
+        return next;
+      });
+    } catch (err) { console.error(err); setError(err.message); }
+    finally { setBrainrotDepositsLoading(false); }
+  };
+
+  const updateBrainrotDepositDraft = (depositId, field, value) => {
+    const id = String(depositId);
+    setBrainrotDepositDrafts((current) => ({ ...current, [id]: { ...(current[id] || {}), [field]: value } }));
+  };
+
+  const reviewBrainrotDeposit = async (deposit, action) => {
+    if (!deposit?.id) return;
+    const draft = brainrotDepositDrafts[String(deposit.id)] || {};
+    const amountCents = Number(draft.amountCents || 0);
+    if (action === "approve" && (!Number.isInteger(amountCents) || amountCents <= 0)) { setError("Enter the approved Brainrot value before crediting."); return; }
+    if (!window.confirm(`Are you sure you want to ${action === "approve" ? "credit" : "reject"} Brainrot deposit #${deposit.id}?`)) return;
+    try {
+      setSaving(true); setError(""); setSuccess("");
+      const response = await apiFetch(`${API}/api/admin/brainrot-deposits/${deposit.id}`, { method: "PATCH", body: JSON.stringify({ action, amountCents: action === "approve" ? amountCents : 0, itemsDescription: draft.itemsDescription || "", staffNote: draft.staffNote || "" }) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || data.error || "Brainrot deposit review failed");
+      setSuccess(action === "approve" ? `Brainrot deposit #${deposit.id} credited with ${money(data.amountCents)}.` : `Brainrot deposit #${deposit.id} rejected.`);
+      await Promise.all([loadAdminBrainrotDeposits(), loadAdminActivity()]);
+    } catch (err) { console.error(err); setError(err.message); }
+    finally { setSaving(false); }
+  };
+
   const loadAdminPayments = async (
     status = adminPaymentStatus,
     search = adminPaymentSearch
@@ -2221,6 +2271,7 @@ setSuccess(
           loadAdminUsers(),
           loadAdminActivity(),
           loadAdminPayments(),
+          loadAdminBrainrotDeposits(),
           loadAdminLogs(),
         ]);
       } catch (err) {
@@ -3141,6 +3192,9 @@ body: JSON.stringify({
             <button type="button" className={adminView === "payments" ? "admin-sidebar-item active" : "admin-sidebar-item"} onClick={() => { setAdminView("payments"); loadAdminPayments(); }}>
               <span className="admin-sidebar-icon">$</span><span>Payments</span>
             </button>
+            <button type="button" className={adminView === "brainrot-deposits" ? "admin-sidebar-item active" : "admin-sidebar-item"} onClick={() => { setAdminView("brainrot-deposits"); loadAdminBrainrotDeposits(); }}>
+              <span className="admin-sidebar-icon">◇</span><span>Brainrot Deposits</span>
+            </button>
             <button type="button" className={adminView === "item-withdrawals" ? "admin-sidebar-item active" : "admin-sidebar-item"} onClick={() => { setAdminView("item-withdrawals"); loadAdminItemWithdrawals(); }}>
               <span className="admin-sidebar-icon">↗</span><span>Item Withdrawals</span>
             </button>
@@ -3339,6 +3393,10 @@ body: JSON.stringify({
                 </small>
               </span>
               <span className="admin-command-arrow">→</span>
+            </button>
+
+            <button type="button" className="admin-command-card brainrot-deposits" onClick={() => { setAdminView("brainrot-deposits"); loadAdminBrainrotDeposits(); }}>
+              <span className="admin-command-icon">◇</span><span className="admin-command-copy"><strong>Brainrot Deposits</strong><small>{brainrotDeposits.filter((deposit) => String(deposit.status || "").toLowerCase() === "pending").length} pending submissions</small></span><span className="admin-command-arrow">→</span>
             </button>
 
             <button
@@ -5257,6 +5315,21 @@ body: JSON.stringify({
                   </tbody>
                 </table>
               </div>
+            </div>
+          </section>
+        )}
+
+        {adminView === "brainrot-deposits" && (
+          <section className="admin-management-card admin-brainrot-deposits-section">
+            <div className="admin-management-head">
+              <div><div className="admin-eyebrow">MANUAL DEPOSITS</div><h2>Brainrot Deposits</h2><p>Verify what you received in-game, set the approved value, then credit the user's CASEX wallet.</p></div>
+              <div className="admin-payment-status-tabs">{[["pending","Pending"],["approved","Approved"],["rejected","Rejected"],["all","All"]].map(([value,label]) => <button key={value} className={brainrotDepositStatus === value ? "active" : ""} onClick={() => { setBrainrotDepositStatus(value); loadAdminBrainrotDeposits(value, brainrotDepositSearch); }}>{label}</button>)}</div>
+            </div>
+            <div className="admin-management-body">
+              <div className="admin-management-toolbar"><div className="admin-search-wrap"><span>⌕</span><input value={brainrotDepositSearch} onChange={(e) => setBrainrotDepositSearch(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") loadAdminBrainrotDeposits(); }} placeholder="Search user or deposit code..." /></div><button className="admin-secondary-button" onClick={() => loadAdminBrainrotDeposits()} disabled={brainrotDepositsLoading}>{brainrotDepositsLoading ? "Loading..." : "↻ Refresh"}</button></div>
+              <div className="admin-activity-table-wrap"><table className="admin-activity-table admin-brainrot-deposits-table"><thead><tr><th>ID</th><th>User</th><th>Deposit Code</th><th>Brainrots Received</th><th>Approved Value</th><th>Status</th><th>Staff Note</th><th>Action</th></tr></thead><tbody>
+                {brainrotDeposits.length === 0 ? <tr><td colSpan="8" className="admin-table-empty">No Brainrot deposits found.</td></tr> : brainrotDeposits.map((deposit) => { const id=String(deposit.id); const draft=brainrotDepositDrafts[id] || {}; return <tr key={deposit.id}><td>#{deposit.id}</td><td><strong>{deposit.username}</strong><small>#{deposit.user_id}</small></td><td><code className="admin-brainrot-code">{deposit.deposit_code}</code></td><td>{deposit.status === "pending" ? <textarea className="admin-brainrot-textarea" value={draft.itemsDescription || ""} onChange={(e) => updateBrainrotDepositDraft(deposit.id,"itemsDescription",e.target.value)} placeholder="e.g. Rainbow Garama, Garama..."/> : <span>{deposit.items_description || "—"}</span>}</td><td>{deposit.status === "pending" ? <div className="admin-brainrot-amount-wrap"><span>$</span><input type="number" min="0" step="0.01" value={Number(draft.amountCents || 0)/100} onChange={(e) => updateBrainrotDepositDraft(deposit.id,"amountCents",Math.round(Number(e.target.value || 0)*100))}/></div> : <span className="admin-table-money">{money(deposit.amount_cents)}</span>}</td><td><span className={`admin-payment-status ${deposit.status}`}>{deposit.status}</span></td><td>{deposit.status === "pending" ? <textarea className="admin-brainrot-textarea" value={draft.staffNote || ""} onChange={(e) => updateBrainrotDepositDraft(deposit.id,"staffNote",e.target.value)} placeholder="Optional internal note..."/> : <span className="admin-table-muted">{deposit.staff_note || "—"}</span>}</td><td>{deposit.status === "pending" ? <div className="admin-payment-actions"><button className="admin-payment-approve" onClick={() => reviewBrainrotDeposit(deposit,"approve")} disabled={saving}>✓ Credit</button><button className="admin-payment-reject" onClick={() => reviewBrainrotDeposit(deposit,"reject")} disabled={saving}>× Reject</button></div> : <span className="admin-table-muted">{deposit.reviewer_username || "Reviewed"}</span>}</td></tr>; })}
+              </tbody></table></div>
             </div>
           </section>
         )}

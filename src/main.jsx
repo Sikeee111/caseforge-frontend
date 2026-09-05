@@ -482,6 +482,8 @@ function App() {
   const [withdrawCurrency, setWithdrawCurrency] = useState("USDTTRC20");
   const [withdrawAddress, setWithdrawAddress] = useState("");
   const [cryptoPayment, setCryptoPayment] = useState(null);
+  const [brainrotDeposit, setBrainrotDeposit] = useState(null);
+  const [brainrotDepositLoading, setBrainrotDepositLoading] = useState(false);
   const [selected, setSelected] = useState(null);
   const [casesPageOpen, setCasesPageOpen] = useState(false);
   const [casesSearch, setCasesSearch] = useState("");
@@ -2115,6 +2117,20 @@ else {
   const closeCryptoPayment = () => {
     setCryptoPayment(null);
   };
+
+  const createBrainrotDeposit = async () => {
+    if (brainrotDepositLoading) return;
+    if (!authUser) { openAuth("login"); return; }
+    setBrainrotDepositLoading(true);
+    try {
+      const response = await apiFetch(`${API}/api/me/brainrot-deposits`, { method: "POST" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || data.error || "Failed to create Brainrot deposit.");
+      setBrainrotDeposit({ ...(data.deposit || {}), discordUrl: data.discordUrl || "https://discord.gg/KGQkXU2sav" });
+    } catch (error) { alert(error.message); } finally { setBrainrotDepositLoading(false); }
+  };
+
+  const closeBrainrotDeposit = () => setBrainrotDeposit(null);
 
 useEffect(() => {
   if (!cryptoPayment?.payAddress) return;
@@ -5689,6 +5705,25 @@ useEffect(() => {
               </button>
             </div>
 
+            {brainrotDeposit && (
+              <div className="brainrot-deposit-backdrop" onClick={closeBrainrotDeposit}>
+                <div className="brainrot-deposit-modal" onClick={(event) => event.stopPropagation()}>
+                  <button type="button" className="close" onClick={closeBrainrotDeposit} aria-label="Close Brainrot deposit">×</button>
+                  <div className="eyebrow">BRAINROT DEPOSIT</div>
+                  <h2>Deposit your Brainrots</h2>
+                  <p>Create a deposit request, open a ticket in our Discord, and send the Brainrots to us in-game. Staff will verify them and manually credit your CASEX balance.</p>
+                  <div className="brainrot-deposit-code"><span>DEPOSIT CODE</span><strong>{brainrotDeposit.deposit_code}</strong></div>
+                  <div className="brainrot-deposit-steps"><div><b>1</b><span>Open a ticket in our Discord</span></div><div><b>2</b><span>Send us the Brainrots in-game</span></div><div><b>3</b><span>Send staff your deposit code</span></div></div>
+                  <div className="brainrot-deposit-note"><span>!</span><p>Your CASEX balance is only credited after staff confirms what was received.</p></div>
+                  <div className="brainrot-deposit-actions">
+                    <button type="button" className="secondary-button" onClick={async () => { try { await navigator.clipboard.writeText(String(brainrotDeposit.deposit_code || "")); } catch {} }}>Copy Code</button>
+                    <button type="button" className="primary" onClick={() => window.open(brainrotDeposit.discordUrl || "https://discord.gg/KGQkXU2sav", "_blank", "noopener,noreferrer")}>Open Discord</button>
+                  </div>
+                  <button type="button" className="secondary-button brainrot-deposit-done" onClick={closeBrainrotDeposit}>Done</button>
+                </div>
+              </div>
+            )}
+
             {walletTab !== "history" ? (
               <>
                 {walletAction === "deposit" && cryptoPayment ? (
@@ -5956,6 +5991,19 @@ useEffect(() => {
   <span>→</span>
 </button>
 
+                    {walletTab === "wallet" && (
+                      <div className="brainrot-deposit-card">
+                        <div className="brainrot-deposit-card-icon">◇</div>
+                        <div className="brainrot-deposit-card-copy">
+                          <strong>Deposit Brainrots</strong>
+                          <span>Send your Brainrots through Discord and receive CASEX balance after manual verification.</span>
+                        </div>
+                        <button type="button" className="secondary-button" onClick={createBrainrotDeposit} disabled={brainrotDepositLoading}>
+                          {brainrotDepositLoading ? "Creating..." : "Deposit Brainrots"}
+                        </button>
+                      </div>
+                    )}
+
                     <div className="wallet-action-note">
                       <span className="wallet-note-icon">i</span>
                       <p>{walletTab === "withdraw" ? "Withdrawals will use your available wallet balance." : "Your balance is credited only after NOWPayments confirms the transaction."}</p>
@@ -5971,7 +6019,8 @@ useEffect(() => {
                       tx.type === "deposit" ||
                       tx.type === "withdrawal" ||
                       tx.type === "withdrawal_pending" ||
-                      tx.type === "withdrawal_rejected"
+                      tx.type === "withdrawal_rejected" ||
+                      tx.type === "brainrot_deposit"
                   );
 
                   return (
@@ -6009,7 +6058,8 @@ useEffect(() => {
                             );
 
                             const positive =
-                              tx.type === "deposit";
+                              tx.type === "deposit" ||
+                              tx.type === "brainrot_deposit";
 
                             const pending =
                               tx.type === "withdrawal_pending";
@@ -6017,7 +6067,9 @@ useEffect(() => {
                             const rejected =
                               tx.type === "withdrawal_rejected";
 
-                            const label = positive
+                            const label = tx.type === "brainrot_deposit"
+                              ? "Brainrot deposit"
+                              : positive
                               ? "Deposit"
                               : pending
                               ? "Withdrawal pending"
