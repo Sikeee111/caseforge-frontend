@@ -469,6 +469,9 @@ function App() {
   const caseRewardsCacheRef = useRef(new Map());
   const [transactions, setTransactions] = useState([]);
   const [walletOpen, setWalletOpen] = useState(false);
+  const [walletNotification, setWalletNotification] = useState(null);
+  const walletNotificationTimerRef = useRef(null);
+  const walletNotificationSeenRef = useRef(new Set());
   const [walletAmount, setWalletAmount] = useState("");
   const [walletAction, setWalletAction] = useState("deposit");
   const [walletLoading, setWalletLoading] = useState(false);
@@ -1848,6 +1851,158 @@ function App() {
     });
   }, [opening, reelItems]);
 
+
+  const dismissWalletNotification = () => {
+    if (walletNotificationTimerRef.current) {
+      window.clearTimeout(walletNotificationTimerRef.current);
+      walletNotificationTimerRef.current = null;
+    }
+
+    setWalletNotification(null);
+  };
+
+  const showWalletNotification = ({
+    tone = "info",
+    icon = "↑",
+    title,
+    message,
+    duration = 6500,
+  }) => {
+    if (!title || !message) return;
+
+    if (walletNotificationTimerRef.current) {
+      window.clearTimeout(walletNotificationTimerRef.current);
+    }
+
+    setWalletNotification({
+      id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      tone,
+      icon,
+      title,
+      message,
+    });
+
+    walletNotificationTimerRef.current = window.setTimeout(() => {
+      setWalletNotification(null);
+      walletNotificationTimerRef.current = null;
+    }, duration);
+  };
+
+  const walletNotificationSeen = (key) => {
+    if (!key) return false;
+
+    if (walletNotificationSeenRef.current.has(key)) {
+      return true;
+    }
+
+    walletNotificationSeenRef.current.add(key);
+
+    try {
+      window.sessionStorage.setItem(
+        `CaseX_wallet_event_${key}`,
+        "1"
+      );
+    } catch {
+      // Ignore unavailable sessionStorage.
+    }
+
+    return false;
+  };
+
+  const restoreWalletNotificationSeen = (key) => {
+    if (!key) return false;
+
+    if (walletNotificationSeenRef.current.has(key)) {
+      return true;
+    }
+
+    try {
+      if (
+        window.sessionStorage.getItem(
+          `CaseX_wallet_event_${key}`
+        ) === "1"
+      ) {
+        walletNotificationSeenRef.current.add(key);
+        return true;
+      }
+    } catch {
+      // Ignore unavailable sessionStorage.
+    }
+
+    return false;
+  };
+
+  const formatWalletNotificationAmount = (amount) => {
+    const value = Number(amount);
+
+    if (!Number.isFinite(value) || value <= 0) {
+      return "";
+    }
+
+    return `$${value.toFixed(2)}`;
+  };
+
+  const getDepositNotificationAmount = (data, payment = cryptoPayment) => {
+    const candidates = [
+      {
+        value: data?.amount_cents,
+        divisor: 100,
+      },
+      {
+        value: data?.amountCents,
+        divisor: 100,
+      },
+      {
+        value: data?.price_amount,
+        divisor: 1,
+      },
+      {
+        value: data?.priceAmount,
+        divisor: 1,
+      },
+      {
+        value: data?.amount,
+        divisor: 1,
+      },
+      {
+        value: payment?.amountCents,
+        divisor: 100,
+      },
+      {
+        value: payment?.priceAmount,
+        divisor: 1,
+      },
+      {
+        value: payment?.price_amount,
+        divisor: 1,
+      },
+    ];
+
+    for (const candidate of candidates) {
+      const value = Number(candidate.value);
+
+      if (!Number.isFinite(value) || value <= 0) {
+        continue;
+      }
+
+      return formatWalletNotificationAmount(
+        value / candidate.divisor
+      );
+    }
+
+    return "";
+  };
+
+  useEffect(() => {
+    return () => {
+      if (walletNotificationTimerRef.current) {
+        window.clearTimeout(
+          walletNotificationTimerRef.current
+        );
+      }
+    };
+  }, []);
+
 const handleWalletAction = async () => {
     const amount =
       walletAction === "withdraw"
@@ -1907,6 +2062,13 @@ if (walletAction === "withdraw") {
     Number(data.newBalanceCents || 0) / 100
   );
   setTransactions(data.transactions || []);
+
+  showWalletNotification({
+    tone: "pending",
+    icon: "↓",
+    title: "Withdrawal Pending",
+    message: `Your ${formatWalletNotificationAmount(amount)} withdrawal has been submitted and is being processed.`,
+  });
 } else {
   await loadTransactions();
 }
@@ -1959,35 +2121,119 @@ useEffect(() => {
 
   let stopped = false;
   let timer = null;
+  let lastStatus = "waiting";
+  let detectedShown = false;
+  let creditedShown = false;
+
+  const paymentKey =
+    cryptoPayment.requestId ||
+    cryptoPayment.paymentId ||
+    cryptoPayment.payAddress;
 
   const checkPayment = async () => {
     try {
-    const response = await apiFetch(
-  `${API}/api/me/wallet/deposit-status?payAddress=${encodeURIComponent(
-    cryptoPayment.payAddress
-  )}`
-);
+      const response = await apiFetch(
+        `${API}/api/me/wallet/deposit-status?payAddress=${encodeURIComponent(
+          cryptoPayment.payAddress
+        )}`
+      );
 
-if (!response.ok || stopped) return;
+      if (!response.ok || stopped) return;
 
-const data = await response.json();
+      const data = await response.json();
 
-if (!data.found || stopped) return;
+      if (!data.found || stopped) return;
 
-const status = String(
-  data.status || "waiting"
-).toLowerCase();
+      const status = String(
+        data.status || "waiting"
+      ).toLowerCase();
+
+      const detectedStatuses = new Set([
+        "pending",
+        "confirming",
+        "confirmed",
+        "sending",
+        "partially_paid",
+        "finished",
+        "completed",
+      ]);
+
+      const failureStatuses = new Set([
+        "failed",
+        "expired",
+        "refunded",
+        "payment_mismatch",
+      ]);
+
+      const detectedTransition =
+        !detectedShown &&
+        status !== "completed" &&
+        detectedStatuses.has(status) &&
+        !detectedStatuses.has(lastStatus);
+
+      if (
+        detectedTransition &&
+        !restoreWalletNotificationSeen(
+          `${paymentKey}:detected`
+        )
+      ) {
+        const currency = String(
+          cryptoPayment.payCurrency || "crypto"
+        ).toUpperCase();
+
+        const amountText =
+          getDepositNotificationAmount(
+            data,
+            cryptoPayment
+          );
+
+        showWalletNotification({
+          tone: "pending",
+          icon: "↑",
+          title: "Deposit Detected",
+          message: amountText
+            ? `Your ${amountText} ${currency} deposit has been detected and is being processed.`
+            : `Your ${currency} deposit has been detected and is being processed.`,
+        });
+
+        walletNotificationSeen(
+          `${paymentKey}:detected`
+        );
+        detectedShown = true;
+      } else if (detectedStatuses.has(status)) {
+        detectedShown = true;
+      }
+
       setCryptoPayment((current) =>
         current
           ? {
               ...current,
-              requestId: data.requestId || null,
+              requestId:
+                data.requestId ||
+                current.requestId ||
+                null,
               status,
+              amountCents:
+                data.amount_cents ??
+                data.amountCents ??
+                current.amountCents ??
+                null,
+              priceAmount:
+                data.price_amount ??
+                data.priceAmount ??
+                current.priceAmount ??
+                null,
             }
           : current
       );
 
-      if (status === "completed") {
+      if (
+        status === "completed" &&
+        !creditedShown &&
+        !restoreWalletNotificationSeen(
+          `${paymentKey}:credited`
+        )
+      ) {
         const meResponse = await apiFetch(
           `${API}/api/auth/me`
         );
@@ -2007,32 +2253,74 @@ const status = String(
 
         await loadTransactions();
 
+        const amountText =
+          getDepositNotificationAmount(
+            data,
+            cryptoPayment
+          );
+
+        showWalletNotification({
+          tone: "success",
+          icon: "✓",
+          title: "Deposit Credited",
+          message: amountText
+            ? `${amountText} has been added to your wallet balance.`
+            : "Your deposit has been added to your wallet balance.",
+        });
+
+        walletNotificationSeen(
+          `${paymentKey}:credited`
+        );
+        creditedShown = true;
+
         if (timer) {
           window.clearInterval(timer);
         }
       }
 
-if (status === "payment_mismatch") {
-  alert(
-    `Deposit was not credited because the amount received is below the minimum deposit of $${Number(
-      data.minimumUsd || cryptoPayment.minimumUsd || 0
-    ).toFixed(2)}.`
-  );
+      if (status === "payment_mismatch") {
+        showWalletNotification({
+          tone: "error",
+          icon: "!",
+          title: "Deposit Not Credited",
+          message:
+            "The received amount did not meet the minimum deposit requirement, so your wallet was not credited.",
+        });
 
-  if (timer) {
-    window.clearInterval(timer);
-  }
+        alert(
+          `Deposit was not credited because the amount received is below the minimum deposit of $${Number(
+            data.minimumUsd ||
+              cryptoPayment.minimumUsd ||
+              0
+          ).toFixed(2)}.`
+        );
 
-  return;
-}
+        if (timer) {
+          window.clearInterval(timer);
+        }
 
-if (
-  ["failed", "expired", "refunded"].includes(status)
-) {
-  if (timer) {
-    window.clearInterval(timer);
-  }
-}
+        return;
+      }
+
+      if (failureStatuses.has(status)) {
+        if (status !== "payment_mismatch") {
+          showWalletNotification({
+            tone: "error",
+            icon: "!",
+            title: "Deposit Failed",
+            message: `Your deposit could not be completed (${status.replaceAll(
+              "_",
+              " "
+            )}).`,
+          });
+        }
+
+        if (timer) {
+          window.clearInterval(timer);
+        }
+      }
+
+      lastStatus = status;
     } catch (error) {
       console.error(
         "Crypto payment status check failed:",
@@ -2042,7 +2330,10 @@ if (
   };
 
   checkPayment();
-  timer = window.setInterval(checkPayment, 4000);
+  timer = window.setInterval(
+    checkPayment,
+    4000
+  );
 
   return () => {
     stopped = true;
@@ -2052,6 +2343,7 @@ if (
     }
   };
 }, [cryptoPayment?.payAddress]);
+
 
   const withdrawItem = async (item) => {
     if (!item || withdrawLoadingId) return;
@@ -2819,6 +3111,34 @@ if (
 
   return (
     <div className="app">
+      {walletNotification && (
+        <div
+          className={`wallet-event-toast ${walletNotification.tone}`}
+          role="status"
+          aria-live="polite"
+        >
+          <div
+            className="wallet-event-toast-icon"
+            aria-hidden="true"
+          >
+            {walletNotification.icon}
+          </div>
+
+          <div className="wallet-event-toast-copy">
+            <strong>{walletNotification.title}</strong>
+            <span>{walletNotification.message}</span>
+          </div>
+
+          <button
+            type="button"
+            className="wallet-event-toast-close"
+            onClick={dismissWalletNotification}
+            aria-label="Dismiss notification"
+          >
+            ×
+          </button>
+        </div>
+      )}
       <header className="nav">
         <div className="brand">
           <div className="brand-mark">

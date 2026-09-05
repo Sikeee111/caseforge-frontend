@@ -1888,6 +1888,129 @@ footer{border-top:1px solid #1c1e26;padding:35px 5vw;display:flex;justify-conten
   to{opacity:1;transform:translateY(0) scale(1)}
 }
 
+/* =========================================================
+   WALLET EVENT NOTIFICATIONS
+   Deposit detected / deposit credited / withdrawal pending.
+   ========================================================= */
+.wallet-event-toast{
+  position:fixed;
+  top:92px;
+  right:24px;
+  z-index:1200;
+  width:min(390px,calc(100vw - 32px));
+  display:flex;
+  align-items:flex-start;
+  gap:12px;
+  padding:14px 15px 14px 14px;
+  border:1px solid #343541;
+  border-radius:14px;
+  background:linear-gradient(145deg,#191a25f5,#0d0e14f5);
+  color:#f4f4f8;
+  box-shadow:0 24px 70px #000b,0 0 32px #a57cff1c;
+  backdrop-filter:blur(18px);
+  animation:walletEventToastIn .26s cubic-bezier(.2,.8,.2,1);
+}
+
+.wallet-event-toast.pending{
+  border-color:#5b438f;
+  box-shadow:0 24px 70px #000b,0 0 32px #8b5cf52b;
+}
+
+.wallet-event-toast.success{
+  border-color:#2f7251;
+  box-shadow:0 24px 70px #000b,0 0 32px #49d88b1c;
+}
+
+.wallet-event-toast.error{
+  border-color:#733344;
+  box-shadow:0 24px 70px #000b,0 0 32px #ff6f7d18;
+}
+
+.wallet-event-toast-icon{
+  width:34px;
+  height:34px;
+  flex:0 0 34px;
+  display:grid;
+  place-items:center;
+  border-radius:10px;
+  background:#a57cff20;
+  color:#b99cff;
+  font-size:16px;
+  font-weight:900;
+}
+
+.wallet-event-toast.success .wallet-event-toast-icon{
+  background:#49d88b1b;
+  color:#72e9a3;
+}
+
+.wallet-event-toast.error .wallet-event-toast-icon{
+  background:#ff6f7d1c;
+  color:#ff8996;
+}
+
+.wallet-event-toast-copy{
+  min-width:0;
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+  padding-top:1px;
+}
+
+.wallet-event-toast-copy strong{
+  color:#fff;
+  font-size:12px;
+  font-weight:900;
+  line-height:1.2;
+}
+
+.wallet-event-toast-copy span{
+  color:#8f91a0;
+  font-size:11px;
+  line-height:1.45;
+  font-weight:600;
+}
+
+.wallet-event-toast-close{
+  width:24px;
+  height:24px;
+  flex:0 0 24px;
+  border:0;
+  background:transparent;
+  color:#717482;
+  display:grid;
+  place-items:center;
+  padding:0;
+  font-size:20px;
+  line-height:1;
+  border-radius:7px;
+}
+
+.wallet-event-toast-close:hover{
+  color:#fff;
+  background:#ffffff0b;
+}
+
+@keyframes walletEventToastIn{
+  from{
+    opacity:0;
+    transform:translate3d(24px,-8px,0) scale(.97);
+  }
+  to{
+    opacity:1;
+    transform:translate3d(0,0,0) scale(1);
+  }
+}
+
+@media(max-width:600px){
+  .wallet-event-toast{
+    top:82px;
+    right:16px;
+    width:calc(100vw - 32px);
+  }
+}
+
 .settings-modal-backdrop{
   position:fixed;
   inset:0;
