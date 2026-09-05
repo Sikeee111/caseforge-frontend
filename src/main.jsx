@@ -5401,6 +5401,22 @@ if (
   </strong>
 </div>
 
+<div className="wallet-crypto-network-warning" role="alert">
+  <span className="wallet-crypto-network-warning-icon">!</span>
+
+  <div>
+    <strong>
+      Send {String(cryptoPayment.payCurrency || "crypto").toUpperCase()} only
+    </strong>
+
+    <p>
+      Only send {String(cryptoPayment.payCurrency || "the selected coin").toUpperCase()} on the{" "}
+      {cryptoPayment.network || "selected network"} network to this address.
+      Sending another asset or using another network may result in permanent loss.
+    </p>
+  </div>
+</div>
+
                     <div style={{ marginBottom: 12 }}>
                       <small style={{ opacity: 0.62 }}>DEPOSIT ADDRESS</small>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 5, padding: "10px 11px", borderRadius: 10, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
@@ -5464,7 +5480,7 @@ if (
                           </div>
                         </label>
 
-                        <label className="wallet-input-wrap wallet-input-premium" style={{ marginBottom: 12 }}>
+<label className="wallet-input-wrap wallet-input-premium wallet-address-field" style={{ marginBottom: 12 }}>
                           <span>Withdrawal wallet address</span>
                           <div>
                             <input
@@ -5478,6 +5494,35 @@ if (
                             />
                           </div>
                         </label>
+
+                        {/* Withdrawal network safety warning: remains inside the withdrawal-only block. */}
+                        <div className="wallet-withdraw-network-warning">
+                          <span className="wallet-withdraw-warning-icon">!</span>
+
+                          <div>
+                          <strong>
+  Send{" "}
+  {CRYPTO_DEPOSIT_OPTIONS.find(
+    (option) => option.code === withdrawCurrency
+  )?.label?.split(" · ")[0] ||
+    String(withdrawCurrency || "crypto").toUpperCase()}{" "}
+  only
+</strong>
+
+<p>
+  Only send{" "}
+  {CRYPTO_DEPOSIT_OPTIONS.find(
+    (option) => option.code === withdrawCurrency
+  )?.label?.split(" · ")[0] ||
+    String(withdrawCurrency || "crypto").toUpperCase()}{" "}
+  on the{" "}
+  {CRYPTO_DEPOSIT_OPTIONS.find(
+    (option) => option.code === withdrawCurrency
+  )?.label?.split(" · ")[1] || "matching network"}{" "}
+  network to this address. Using the wrong network or asset may result in permanent loss.
+</p>
+                          </div>
+                        </div>
                       </>
                     )}
 
@@ -5512,8 +5557,8 @@ if (
 )}
 
 {walletTab === "withdraw" && (
-  <label className="wallet-input-wrap wallet-input-premium">
-    <span>Amount</span>
+<label className="wallet-input-wrap wallet-input-premium wallet-amount-field">
+  <span>Amount</span>
     <div>
       <span>$</span>
       <input
@@ -5713,21 +5758,36 @@ if (
                                   {icon}
                                 </div>
 
-                                <div className="wallet-history-info">
-                                  <strong>{label}</strong>
+ <div className="wallet-history-info">
+  <div className="wallet-history-title-row">
+    <strong>{label}</strong>
 
-                                  <small>
-                                    {formattedDate || "Date unavailable"}
-                                    {formattedTime
-                                      ? ` · ${formattedTime}`
-                                      : ""}
-                                    {pending
-                                      ? " · Pending"
-                                      : rejected
-                                      ? " · Rejected"
-                                      : ""}
-                                  </small>
-                                </div>
+    <span
+      className={`wallet-history-status ${
+        positive
+          ? "completed"
+          : pending
+          ? "pending"
+          : rejected
+          ? "rejected"
+          : "completed"
+      }`}
+    >
+      {positive
+        ? "Completed"
+        : pending
+        ? "Pending"
+        : rejected
+        ? "Rejected"
+        : "Completed"}
+    </span>
+  </div>
+
+  <small>
+    {formattedDate || "Date unavailable"}
+    {formattedTime ? ` · ${formattedTime}` : ""}
+  </small>
+</div>
 
                                 <div
                                   className={`wallet-history-amount ${
