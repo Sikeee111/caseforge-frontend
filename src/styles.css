@@ -24325,3 +24325,49 @@ a:focus-visible{
   border:1px solid rgba(255,90,110,.20);
   background:rgba(255,90,110,.08);
 }
+
+/* Wallet history status badges */
+.wallet-history-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.wallet-history-title-row strong {
+  min-width: 0;
+}
+
+.wallet-history-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+
+  padding: 3px 7px;
+  border-radius: 999px;
+
+  font-size: 7px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+
+.wallet-history-status.completed {
+  color: #79e7b2;
+  border: 1px solid rgba(70, 220, 150, .20);
+  background: rgba(70, 220, 150, .08);
+}
+
+.wallet-history-status.pending {
+  color: #d2b2ff;
+  border: 1px solid rgba(155, 95, 255, .22);
+  background: rgba(155, 95, 255, .09);
+}
+
+.wallet-history-status.rejected {
+  color: #ff9ca8;
+  border: 1px solid rgba(255, 90, 110, .20);
+  background: rgba(255, 90, 110, .08);
+}

@@ -6188,19 +6188,22 @@ if (
                   <button
                     className="secondary-button result-action result-action-sell"
                     onClick={() =>
-                      setSellConfirmItem(
-                        {
-                          id: wonInventoryId,
-                          name: result.name,
-                          rarity:
-                            result.rarity,
-                          value_cents:
-                            Number(
-                              result.valueCents ||
-                                0
-                            ),
-                        }
-                      )
+setSellConfirmItem({
+  id: wonInventoryId,
+  name: result.name,
+  rarity: result.rarity,
+  value_cents: Number(
+    result.valueCents || 0
+  ),
+  image_url:
+    result.image_url ||
+    result.imageUrl ||
+    "",
+  imageUrl:
+    result.image_url ||
+    result.imageUrl ||
+    "",
+})
                     }
                     disabled={
                       !wonInventoryId
