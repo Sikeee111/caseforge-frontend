@@ -3298,30 +3298,25 @@ useEffect(() => {
           </button>
         </nav>
 
-        <div className="nav-actions">
-          <button
-            className="balance balance-button"
-            onClick={() => {
-              if (!authUser) {
-                openAuth("login");
-                return;
-              }
+<div className="nav-actions">
+  {authUser && (
+    <button
+      className="balance balance-button"
+      onClick={() => {
+        setWalletOpen(true);
+        setWalletTab("wallet");
+        setWalletAction("deposit");
+      }}
+    >
+      💰 ${balance.toFixed(2)}{" "}
+      <span>+</span>
+    </button>
+  )}
 
-              setWalletOpen(true);
-              setWalletTab("wallet");
-              setWalletAction(
-                "deposit"
-              );
-            }}
-          >
-            💰 ${balance.toFixed(2)}{" "}
-            <span>+</span>
-          </button>
-
-          <div
-            className="profile-menu"
-            ref={profileRef}
-          >
+  <div
+    className="profile-menu"
+    ref={profileRef}
+  >
             <button
               className={`avatar-button ${
                 profileOpen
