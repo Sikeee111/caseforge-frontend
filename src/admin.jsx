@@ -496,6 +496,7 @@ function Admin() {
   const [analytics, setAnalytics] = useState(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [analyticsUpdatedAt, setAnalyticsUpdatedAt] = useState(null);
+  const [analyticsResetting, setAnalyticsResetting] = useState(false);
   const [adminView, setAdminView] = useState("dashboard");
   const [assetSearch, setAssetSearch] = useState("");
   const [assetRarity, setAssetRarity] = useState("all");
@@ -835,7 +836,14 @@ setEditingCase({
   const loadAnalytics = async () => {
     try {
       setAnalyticsLoading(true);
-      const response = await apiFetch(`${API}/api/admin/analytics`);
+
+      // Prevent the browser/proxy from returning a cached analytics response.
+      const response = await apiFetch(
+        `${API}/api/admin/analytics?_=${Date.now()}`,
+        {
+          cache: "no-store",
+        }
+      );
       const data = await response.json();
 
       if (!response.ok) {
@@ -849,6 +857,52 @@ setEditingCase({
       setError(err.message);
     } finally {
       setAnalyticsLoading(false);
+    }
+  };
+
+  const resetAnalytics = async () => {
+    if (analyticsResetting) return;
+
+    const confirmed = window.confirm(
+      "Reset launch analytics now? This will make the Analytics page count activity from this moment forward. Existing database records will NOT be deleted."
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setAnalyticsResetting(true);
+      setError("");
+      setSuccess("");
+
+      const response = await apiFetch(
+        `${API}/api/admin/analytics/reset`,
+        {
+          method: "POST",
+          cache: "no-store",
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message ||
+            data.error ||
+            "Failed to reset analytics"
+        );
+      }
+
+      setSuccess(
+        data.message ||
+          "Analytics reset successfully. New activity will count from now."
+      );
+
+      await loadAnalytics();
+    } catch (err) {
+      console.error("Analytics reset failed:", err);
+      setError(err.message || "Failed to reset analytics");
+    } finally {
+      setAnalyticsResetting(false);
     }
   };
 
@@ -3262,7 +3316,7 @@ body: JSON.stringify({
               <div>
                 <div className="admin-eyebrow">PLATFORM OVERVIEW</div>
                 <h2>Analytics</h2>
-                <p>Live totals calculated from your database.</p>
+                <p>Live totals calculated from your database since the current analytics launch point.</p>
               </div>
               <div className="admin-analytics-live-meta">
                 <span className="admin-analytics-live-dot"></span>
@@ -3274,9 +3328,21 @@ body: JSON.stringify({
                   type="button"
                   className="admin-analytics-refresh"
                   onClick={loadAnalytics}
-                  disabled={analyticsLoading}
+                  disabled={analyticsLoading || analyticsResetting}
                 >
                   {analyticsLoading ? "Refreshing..." : "↻ Refresh"}
+                </button>
+                <button
+                  type="button"
+                  className="admin-analytics-refresh"
+                  onClick={resetAnalytics}
+                  disabled={analyticsLoading || analyticsResetting}
+                  style={{
+                    borderColor: "rgba(255, 174, 88, 0.35)",
+                    color: "#ffbd78",
+                  }}
+                >
+                  {analyticsResetting ? "Resetting..." : "Reset Launch"}
                 </button>
               </div>
             </div>
