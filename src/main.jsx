@@ -381,7 +381,7 @@ function formatCreatorDate(value) {
 function useScrollReveal() {
   useEffect(() => {
     const nodes = Array.from(document.querySelectorAll(
-      ".section, .how, .fair, .faq, .case-grid .case-card, .recent-wins, .steps > div"
+      ".section, .how, .fair, .faq, .case-grid .case-card, .recent-wins, .steps > div, .jackpot-live-player"
     ));
 
     if (!nodes.length) return undefined;
@@ -409,59 +409,658 @@ function useScrollReveal() {
   }, []);
 }
 
+
+function JackpotWheel({ players = [], totalCents = 0 }) {
+  const numericTotal = Math.max(0, Number(totalCents || 0));
+
+  const sortedPlayers = [...players]
+    .map((player) => ({
+      ...player,
+      contributionCents: Math.max(
+        0,
+        Number(player.contributionCents || 0)
+      ),
+      odds: Math.max(0, Number(player.odds || 0)),
+    }))
+    .sort(
+      (a, b) =>
+        b.contributionCents - a.contributionCents
+    );
+
+  const maxVisiblePlayers = 10;
+  const visiblePlayers = sortedPlayers.slice(
+    0,
+    maxVisiblePlayers
+  );
+
+  const othersCents = sortedPlayers
+    .slice(maxVisiblePlayers)
+    .reduce(
+      (sum, player) =>
+        sum + player.contributionCents,
+      0
+    );
+
+  if (othersCents > 0) {
+    visiblePlayers.push({
+      userId: "others",
+      username: "Others",
+      contributionCents: othersCents,
+      odds:
+        numericTotal > 0
+          ? (othersCents / numericTotal) * 100
+          : 0,
+      isOthers: true,
+    });
+  }
+
+  const hasEntries =
+    numericTotal > 0 &&
+    visiblePlayers.length > 0;
+
+  const colors = [
+    "#9d6cff",
+    "#7b4fe0",
+    "#b779ff",
+    "#6546bb",
+    "#8f65dc",
+    "#5c49a2",
+    "#a875ed",
+    "#7258c0",
+    "#9467d8",
+    "#60479c",
+    "#858092",
+  ];
+
+  const size = 520;
+  const center = size / 2;
+  const outerRadius = 226;
+  const innerRadius = 118;
+
+  const polar = (radius, angleDegrees) => {
+    const radians =
+      ((angleDegrees - 90) * Math.PI) / 180;
+
+    return {
+      x: center + radius * Math.cos(radians),
+      y: center + radius * Math.sin(radians),
+    };
+  };
+
+  const arcPath = (
+    startAngle,
+    endAngle
+  ) => {
+    const startOuter = polar(
+      outerRadius,
+      startAngle
+    );
+    const endOuter = polar(
+      outerRadius,
+      endAngle
+    );
+    const endInner = polar(
+      innerRadius,
+      endAngle
+    );
+    const startInner = polar(
+      innerRadius,
+      startAngle
+    );
+
+    const largeArc =
+      endAngle - startAngle > 180
+        ? 1
+        : 0;
+
+    return [
+      `M ${startOuter.x} ${startOuter.y}`,
+      `A ${outerRadius} ${outerRadius} 0 ${largeArc} 1 ${endOuter.x} ${endOuter.y}`,
+      `L ${endInner.x} ${endInner.y}`,
+      `A ${innerRadius} ${innerRadius} 0 ${largeArc} 0 ${startInner.x} ${startInner.y}`,
+      "Z",
+    ].join(" ");
+  };
+
+  let runningAngle = 0;
+
+  return (
+    <div
+      className={`jackpot-wheel-modern ${
+        hasEntries ? "has-entries" : "empty"
+      }`}
+    >
+      <div className="jackpot-wheel-modern-glow"></div>
+
+      <svg
+        className="jackpot-wheel-modern-svg"
+        viewBox={`0 0 ${size} ${size}`}
+        role="img"
+        aria-label="Weighted jackpot wheel"
+      >
+        <defs>
+          {colors.map((color, index) => (
+            <linearGradient
+              key={`segment-gradient-${index}`}
+              id={`jackpot-segment-${index}`}
+              x1="0%"
+              y1="0%"
+              x2="100%"
+              y2="100%"
+            >
+              <stop offset="0%" stopColor="#ffffff" stopOpacity="0.16" />
+              <stop offset="28%" stopColor={color} />
+              <stop offset="100%" stopColor="#080b12" stopOpacity="0.74" />
+            </linearGradient>
+          ))}
+          <radialGradient id="jackpotWheelHub" cx="34%" cy="28%" r="78%">
+            <stop offset="0%" stopColor="#8d61c8" />
+            <stop offset="42%" stopColor="#3d2858" />
+            <stop offset="74%" stopColor="#1b1926" />
+            <stop offset="100%" stopColor="#0d0f15" />
+          </radialGradient>
+          <radialGradient id="jackpotWheelEmpty" cx="50%" cy="30%" r="75%">
+            <stop offset="0%" stopColor="#27223a" />
+            <stop offset="58%" stopColor="#131620" />
+            <stop offset="100%" stopColor="#090c12" />
+          </radialGradient>
+          <filter id="jackpotWheelShadow" x="-30%" y="-30%" width="160%" height="160%">
+            <feDropShadow dx="0" dy="12" stdDeviation="14" floodColor="#000000" floodOpacity="0.42" />
+          </filter>
+        </defs>
+
+        <circle
+          cx={center}
+          cy={center}
+          r={outerRadius + 10}
+          fill="none"
+          stroke="rgba(213,184,255,.28)"
+          strokeWidth="2"
+        />
+        <circle
+          cx={center}
+          cy={center}
+          r={outerRadius + 17}
+          fill="none"
+          stroke="rgba(138,92,214,.16)"
+          strokeWidth="7"
+          strokeDasharray="2 11"
+        />
+
+        {!hasEntries ? (
+          <>
+            <circle
+              cx={center}
+              cy={center}
+              r={outerRadius}
+              fill="url(#jackpotWheelEmpty)"
+              stroke="#6c4aa1"
+              strokeWidth="3"
+            />
+            <circle
+              cx={center}
+              cy={center}
+              r={innerRadius}
+              fill="#0c0f16"
+              stroke="rgba(176,132,255,.35)"
+              strokeWidth="2"
+            />
+          </>
+        ) : (
+          visiblePlayers.map(
+            (player, index) => {
+              const sweep =
+                Math.max(0, player.odds) * 3.6;
+              const startAngle =
+                runningAngle;
+              const endAngle =
+                runningAngle + sweep;
+
+              runningAngle = endAngle;
+
+              const midAngle =
+                startAngle + sweep / 2;
+
+              const labelPoint =
+                polar(172, midAngle);
+
+              const avatarPoint =
+                polar(198, midAngle);
+
+              const fill =
+                colors[index % colors.length];
+
+              const initials =
+                player.isOthers
+                  ? "…"
+                  : String(
+                      player.username ||
+                        "P"
+                    )
+                      .slice(0, 1)
+                      .toUpperCase();
+
+              const showText =
+                sweep >= 32 &&
+                !player.isOthers;
+
+              return (
+                <g
+                  key={`wheel-segment-${player.userId}`}
+                >
+                  <path
+                    d={arcPath(
+                      startAngle,
+                      endAngle
+                    )}
+                    fill={`url(#jackpot-segment-${index % colors.length})`}
+                    fillOpacity={
+                      player.isOthers
+                        ? 0.68
+                        : 0.96
+                    }
+                    stroke="#0a0d14"
+                    strokeWidth="4"
+                    filter="url(#jackpotWheelShadow)"
+                  />
+
+                  <path
+                    d={arcPath(
+                      startAngle + 0.4,
+                      Math.max(
+                        startAngle + 0.6,
+                        endAngle - 0.4
+                      )
+                    )}
+                    fill="none"
+                    stroke="rgba(255,255,255,.10)"
+                    strokeWidth="1"
+                  />
+
+                  <circle
+                    cx={avatarPoint.x}
+                    cy={avatarPoint.y}
+                    r={sweep >= 28 ? 20 : 16}
+                    fill="#0a0d14"
+                    fillOpacity="0.88"
+                    stroke="#f1e8ff"
+                    strokeOpacity="0.82"
+                    strokeWidth="2.5"
+                  />
+
+                  <text
+                    x={avatarPoint.x}
+                    y={avatarPoint.y + 5}
+                    textAnchor="middle"
+                    fill="#fff"
+                    fontSize={sweep >= 28 ? 14 : 11}
+                    fontWeight="950"
+                  >
+                    {initials}
+                  </text>
+
+                  {showText && (
+                    <g>
+                      <text
+                        x={labelPoint.x}
+                        y={labelPoint.y - 3}
+                        textAnchor="middle"
+                        fill="#fff"
+                        fontSize="10"
+                        fontWeight="900"
+                      >
+                        {String(
+                          player.username || ""
+                        ).slice(0, 11)}
+                      </text>
+
+                      <text
+                        x={labelPoint.x}
+                        y={labelPoint.y + 11}
+                        textAnchor="middle"
+                        fill="#b7f5bc"
+                        fontSize="8"
+                        fontWeight="900"
+                      >
+                        {Number(
+                          player.odds || 0
+                        ).toFixed(2)}
+                        %
+                      </text>
+                    </g>
+                  )}
+                </g>
+              );
+            }
+          )
+        )}
+
+        <circle
+          cx={center}
+          cy={center}
+          r={innerRadius - 8}
+          fill="#0b0e15"
+          stroke="#9d6cff"
+          strokeWidth="4"
+        />
+
+        <circle
+          cx={center}
+          cy={center}
+          r={innerRadius - 20}
+          fill="url(#jackpotWheelHub)"
+          stroke="rgba(232,211,255,.42)"
+          strokeWidth="1.5"
+        />
+
+        <text
+          x={center}
+          y={center - 5}
+          textAnchor="middle"
+          fill="#f7f2ff"
+          fontSize="19"
+          fontWeight="950"
+        >
+          {hasEntries
+            ? `$${(
+                numericTotal / 100
+              ).toFixed(2)}`
+            : "EMPTY"}
+        </text>
+
+        <text
+          x={center}
+          y={center + 16}
+          textAnchor="middle"
+          fill="#9891a5"
+          fontSize="8"
+          fontWeight="900"
+          letterSpacing="1.4"
+        >
+          {hasEntries
+            ? "TOTAL JACKPOT"
+            : "WAITING FOR ENTRIES"}
+        </text>
+      </svg>
+    </div>
+  );
+}
+
 function App() {
   useScrollReveal();
   const [balance, setBalance] = useState(100);
+
+  const [authUser, setAuthUser] = useState(null);
   const [cases, setCases] = useState(fallbackCases);
   const [inventory, setInventory] = useState([]);
   const [recentWins, setRecentWins] = useState([]);
   const [liveActivity, setLiveActivity] = useState([]);
   const [liveActivityLoading, setLiveActivityLoading] = useState(true);
-    const [jackpotPot, setJackpotPot] =
-    useState(12450.75);
 
-  const [jackpotEntries, setJackpotEntries] =
-    useState(1284);
+  const [jackpotData, setJackpotData] = useState(null);
+  const [jackpotLoading, setJackpotLoading] = useState(true);
+  const [jackpotNow, setJackpotNow] = useState(Date.now());
+  const [jackpotEntryOpen, setJackpotEntryOpen] = useState(false);
+  const [jackpotEntryMode, setJackpotEntryMode] = useState("balance");
+  const [jackpotAmount, setJackpotAmount] = useState("");
+  const [jackpotEntryLoading, setJackpotEntryLoading] = useState(false);
+  const [jackpotEntryError, setJackpotEntryError] = useState("");
+  const [jackpotSelectedInventoryIds, setJackpotSelectedInventoryIds] = useState(
+    () => new Set()
+  );
 
-  const [jackpotContribution, setJackpotContribution] =
-    useState(125);
+  const jackpotPotCents = Number(jackpotData?.round?.totalCents || 0);
+  const jackpotPlayers = Array.isArray(jackpotData?.players)
+    ? jackpotData.players
+    : [];
+  const jackpotMyPlayer = jackpotPlayers.find(
+    (player) => Number(player.userId) === Number(authUser?.id)
+  );
+  const jackpotMyContributionCents = Number(
+    jackpotMyPlayer?.contributionCents || 0
+  );
+  const jackpotMyOdds = Number(jackpotMyPlayer?.odds || 0);
 
-  const [jackpotTimeLeft, setJackpotTimeLeft] =
-    useState({
-      days: 2,
-      hours: 14,
-      minutes: 32,
-      seconds: 18,
+  const jackpotTimeLeft = useMemo(() => {
+    const end = new Date(
+      jackpotData?.round?.endsAt || 0
+    ).getTime();
+
+    let total = Math.max(
+      0,
+      Math.floor((end - jackpotNow) / 1000)
+    );
+
+    return {
+      days: Math.floor(total / 86400),
+      hours: Math.floor((total % 86400) / 3600),
+      minutes: Math.floor((total % 3600) / 60),
+      seconds: total % 60,
+    };
+  }, [jackpotData?.round?.endsAt, jackpotNow]);
+
+  const jackpotAvailableInventory = inventory.filter(
+    (item) =>
+      String(item.status || "owned").toLowerCase() === "owned"
+  );
+
+  const jackpotSelectedItems = jackpotAvailableInventory.filter(
+    (item) => jackpotSelectedInventoryIds.has(Number(item.id))
+  );
+
+  const jackpotSelectedValueCents = jackpotSelectedItems.reduce(
+    (total, item) =>
+      total + Math.max(0, Number(item.value_cents || 0)),
+    0
+  );
+
+  const openJackpotEntry = (mode = "balance") => {
+    if (!authUser) {
+      openAuth("login");
+      return;
+    }
+
+    setJackpotEntryMode(mode);
+    setJackpotAmount("");
+    setJackpotEntryError("");
+    setJackpotSelectedInventoryIds(new Set());
+    setJackpotEntryOpen(true);
+  };
+
+  const closeJackpotEntry = () => {
+    if (jackpotEntryLoading) return;
+
+    setJackpotEntryOpen(false);
+    setJackpotEntryError("");
+    setJackpotAmount("");
+    setJackpotSelectedInventoryIds(new Set());
+  };
+
+  const toggleJackpotInventoryItem = (itemId) => {
+    const numericId = Number(itemId);
+
+    setJackpotSelectedInventoryIds((current) => {
+      const next = new Set(current);
+
+      if (next.has(numericId)) {
+        next.delete(numericId);
+      } else {
+        next.add(numericId);
+      }
+
+      return next;
     });
+  };
 
-  const jackpotOdds =
-    jackpotPot > 0
-      ? (jackpotContribution / jackpotPot) * 100
+  const loadJackpot = async () => {
+    try {
+      const response = await apiFetch(`${API}/api/jackpot`);
+
+      const responseText = await response.text();
+      let data;
+
+      try {
+        data = JSON.parse(responseText);
+      } catch {
+        throw new Error(
+          `Jackpot server returned an invalid response (${response.status}).`
+        );
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          data.error || "Failed to load jackpot"
+        );
+      }
+
+      setJackpotData(data);
+    } catch (error) {
+      console.error("Jackpot load failed:", error);
+    } finally {
+      setJackpotLoading(false);
+    }
+  };
+
+  const enterJackpotWithBalance = async () => {
+    if (!authUser || jackpotEntryLoading) return;
+
+    const numericAmount = Number(jackpotAmount);
+    const amountCents = Number.isFinite(numericAmount)
+      ? Math.round(numericAmount * 100)
       : 0;
 
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      setJackpotTimeLeft((current) => {
-        let total =
-          Number(current.days || 0) * 86400 +
-          Number(current.hours || 0) * 3600 +
-          Number(current.minutes || 0) * 60 +
-          Number(current.seconds || 0) - 1;
+    if (!Number.isInteger(amountCents) || amountCents < 10) {
+      setJackpotEntryError(
+        "Minimum jackpot contribution is $0.10."
+      );
+      return;
+    }
 
-        if (total < 0) {
-          total = 7 * 86400 + 14 * 3600 + 32 * 60 + 18;
+    if (amountCents > Math.round(Number(balance) * 100)) {
+      setJackpotEntryError(
+        "You do not have enough CASEX balance for this contribution."
+      );
+      return;
+    }
+
+    setJackpotEntryLoading(true);
+    setJackpotEntryError("");
+
+    try {
+      const response = await apiFetch(
+        `${API}/api/jackpot/enter/balance`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ amountCents }),
         }
+      );
 
-        return {
-          days: Math.floor(total / 86400),
-          hours: Math.floor((total % 86400) / 3600),
-          minutes: Math.floor((total % 3600) / 60),
-          seconds: total % 60,
-        };
-      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message ||
+            data.error ||
+            "Failed to enter the jackpot"
+        );
+      }
+
+      setBalance(
+        Number(data.newBalanceCents || 0) / 100
+      );
+
+      await Promise.all([
+        loadJackpot(),
+        loadTransactions(),
+      ]);
+
+      closeJackpotEntry();
+    } catch (error) {
+      console.error("Jackpot balance entry failed:", error);
+      setJackpotEntryError(error.message);
+    } finally {
+      setJackpotEntryLoading(false);
+    }
+  };
+
+  const enterJackpotWithBrainrots = async () => {
+    if (!authUser || jackpotEntryLoading) return;
+
+    const inventoryIds = Array.from(
+      jackpotSelectedInventoryIds
+    );
+
+    if (!inventoryIds.length) {
+      setJackpotEntryError(
+        "Select at least one Brainrot."
+      );
+      return;
+    }
+
+    if (jackpotSelectedValueCents < 10) {
+      setJackpotEntryError(
+        "The selected Brainrots must be worth at least $0.10."
+      );
+      return;
+    }
+
+    setJackpotEntryLoading(true);
+    setJackpotEntryError("");
+
+    try {
+      const response = await apiFetch(
+        `${API}/api/jackpot/enter/brainrots`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ inventoryIds }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message ||
+            data.error ||
+            "Failed to enter the selected Brainrots"
+        );
+      }
+
+      await Promise.all([
+        loadJackpot(),
+        loadInventory(),
+      ]);
+
+      closeJackpotEntry();
+    } catch (error) {
+      console.error("Jackpot Brainrot entry failed:", error);
+      setJackpotEntryError(error.message);
+    } finally {
+      setJackpotEntryLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadJackpot();
+
+    const refreshTimer = window.setInterval(() => {
+      void loadJackpot();
+    }, 5000);
+
+    const clockTimer = window.setInterval(() => {
+      setJackpotNow(Date.now());
     }, 1000);
 
-    return () => window.clearInterval(timer);
+    return () => {
+      window.clearInterval(refreshTimer);
+      window.clearInterval(clockTimer);
+    };
   }, []);
   const liveActivityRequestRef = useRef(false);
   const liveActivityInitializedRef = useRef(false);
@@ -540,7 +1139,6 @@ function App() {
     confirmPassword: "",
   });
 
-  const [authUser, setAuthUser] = useState(null);
   const [authOpen, setAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState("login");
   const [authLoading, setAuthLoading] = useState(false);
@@ -3783,88 +4381,739 @@ useEffect(() => {
         </section>
 
         {/* =========================================================
-           WEEKLY JACKPOT — PREMIUM HERO
+           DAILY JACKPOT — LIVE
            ========================================================= */}
-        <section id="jackpot" className="section jackpot-hero-section-v2">
-<style>{`.jackpot-hero-section-v2{padding:36px 0 44px}.jackpot-hero-v2{position:relative;overflow:hidden;max-width:1100px;margin:0 auto;padding:28px 30px 24px;border:1px solid #4d2d78;border-radius:22px;background:radial-gradient(circle at 78% 24%,rgba(142,86,255,.24),transparent 34%),radial-gradient(circle at 18% 0%,rgba(168,85,247,.09),transparent 30%),linear-gradient(135deg,#111019,#08090f 72%);box-shadow:0 24px 80px rgba(64,32,128,.28),inset 0 1px 0 rgba(255,255,255,.04)}.jackpot-hero-v2:before{content:"";position:absolute;inset:0;border-radius:22px;background:linear-gradient(125deg,rgba(180,130,255,.12),transparent 32%,rgba(156,99,255,.06));pointer-events:none}.jackpot-hero-top-v2,.jackpot-stats-grid-v2,.jackpot-countdown-v2,.jackpot-join-v2,.jackpot-bottom-v2{position:relative;z-index:3}.jackpot-hero-top-v2{display:flex;align-items:flex-start;justify-content:space-between;gap:22px}.jackpot-hero-copy-v2{max-width:60%}.jackpot-hero-badge-v2{display:inline-flex;align-items:center;gap:7px;padding:7px 11px;border:1px solid #5b3a8d;border-radius:9px;background:#1c142a;color:#c7a3ff;font-size:9px;font-weight:900;letter-spacing:.13em}.jackpot-hero-badge-v2 i{width:7px;height:7px;border-radius:50%;background:#b78aff;box-shadow:0 0 12px #b78aff}.jackpot-hero-copy-v2 h2{margin:12px 0 6px;font-size:38px;line-height:1;letter-spacing:-.045em}.jackpot-hero-copy-v2 p{margin:0;color:#8b8e9b;font-size:12px;font-weight:600}.jackpot-coming-soon-v2{position:relative;z-index:3;display:flex;align-items:center;gap:16px;margin-top:28px;padding:18px 20px;border:1px solid #3d2c55;border-radius:14px;background:linear-gradient(135deg,rgba(27,19,42,.86),rgba(9,10,16,.9));box-shadow:inset 0 1px 0 rgba(255,255,255,.03)}.jackpot-coming-soon-icon-v2{width:46px;height:46px;display:grid;place-items:center;flex:0 0 46px;border:1px solid #644593;border-radius:12px;background:#1a1228;font-size:20px;box-shadow:0 0 24px rgba(145,93,231,.18)}.jackpot-coming-soon-v2 small{display:block;color:#8e79aa;font-size:8px;font-weight:900;letter-spacing:.14em}.jackpot-coming-soon-v2 strong{display:block;margin-top:5px;color:#f5f2fa;font-size:16px;line-height:1.1}.jackpot-coming-soon-v2 span{display:block;margin-top:5px;color:#777a87;font-size:10px;font-weight:600}.jackpot-join-locked{opacity:.55!important;cursor:not-allowed!important;filter:grayscale(.35)!important;box-shadow:none!important;transform:none!important}.jackpot-draw-pill-v2{display:flex;align-items:center;gap:7px;padding:9px 12px;border:1px solid #4d356c;border-radius:10px;background:#15101e;color:#c39dff;font-size:10px;font-weight:800;white-space:nowrap}.jackpot-draw-pill-v2 i{width:7px;height:7px;border-radius:50%;background:#8f62ed;box-shadow:0 0 10px #8f62ed}.jackpot-vault-v2{position:absolute;right:34px;top:12px;width:330px;height:178px;pointer-events:none;z-index:1}.jackpot-vault-glow-v2{position:absolute;right:18px;top:22px;width:270px;height:130px;border-radius:50%;background:#9a5cff28;filter:blur(24px)}.jackpot-vault-platform-v2{position:absolute;right:0;bottom:5px;width:310px;height:27px;border-radius:50%;border:1px solid #7147a7;background:#9d64ff12;box-shadow:0 0 28px #9862ff25}.jackpot-vault-body-v2{position:absolute;right:55px;bottom:30px;width:210px;height:108px;border:2px solid #9568df;border-radius:18px;background:linear-gradient(145deg,#2b1949,#100d18 72%);box-shadow:0 0 32px #8b5cf65a,inset 0 0 25px #a36cff18}.jackpot-vault-lid-v2{position:absolute;right:42px;bottom:121px;width:236px;height:32px;border:2px solid #ac7bf7;border-radius:16px 16px 8px 8px;background:linear-gradient(180deg,#7446c5,#251637);box-shadow:0 0 28px #9a6cff55}.jackpot-vault-lock-v2{position:absolute;right:148px;bottom:63px;width:30px;height:34px;border:2px solid #d0b4ff;border-radius:8px;background:#25183a;box-shadow:0 0 18px #a776ff88}.jackpot-vault-lock-v2:before{content:"";position:absolute;left:6px;top:-14px;width:14px;height:16px;border:2px solid #d0b4ff;border-bottom:0;border-radius:11px 11px 0 0}.jackpot-coin-v2{position:absolute;border-radius:50%;border:2px solid #b083f4;background:linear-gradient(145deg,#c091ff,#4b2977);box-shadow:0 0 15px #9c6cff66}.jackpot-coin-v2.c1{right:8px;bottom:22px;width:32px;height:10px}.jackpot-coin-v2.c2{right:-1px;bottom:39px;width:44px;height:12px}.jackpot-coin-v2.c3{right:28px;bottom:56px;width:35px;height:10px}.jackpot-coin-v2.c4{right:242px;bottom:20px;width:38px;height:11px}.jackpot-stats-grid-v2{display:grid;grid-template-columns:1.22fr 1fr 1fr 1.55fr;gap:10px;margin-top:30px}.jackpot-stat-v2,.jackpot-contribution-v2{min-height:88px;padding:15px 16px;border:1px solid #30243f;border-radius:14px;background:rgba(7,8,13,.82);box-shadow:inset 0 1px 0 rgba(255,255,255,.025)}.jackpot-stat-v2 small,.jackpot-contribution-head-v2 small{display:block;color:#777a87;font-size:9px;font-weight:900;letter-spacing:.13em}.jackpot-stat-v2 strong{display:block;margin-top:11px;color:#f5f2fa;font-size:25px;line-height:1;letter-spacing:-.04em}.jackpot-stat-v2.pot{border-color:#56367f;background:linear-gradient(145deg,#1b1329,#0d0c13)}.jackpot-stat-v2.pot strong{color:#bb91ff;text-shadow:0 0 28px #9d67ff55}.jackpot-contribution-v2{position:relative;overflow:hidden}.jackpot-contribution-head-v2{display:flex;align-items:center;justify-content:space-between;gap:10px}.jackpot-contribution-head-v2 b{color:#c09aff;font-size:16px}.jackpot-contribution-bar-v2{height:7px;margin-top:18px;border-radius:999px;background:#20182c;overflow:hidden}.jackpot-contribution-bar-v2 div{height:100%;min-width:3px;border-radius:inherit;background:linear-gradient(90deg,#7a49d7,#bd94ff);box-shadow:0 0 16px #a06dff66}.jackpot-contribution-foot-v2{display:flex;justify-content:space-between;margin-top:7px;color:#686c79;font-size:8px;font-weight:800}.jackpot-countdown-v2{display:flex;justify-content:flex-end;align-items:center;gap:7px;margin-top:10px;color:#6f7280;font-size:9px;font-weight:800}.jackpot-countdown-v2 span{color:#c19dff}.jackpot-join-v2{width:100%;height:54px;margin-top:16px;border:1px solid #b183ff;border-radius:12px;background:linear-gradient(100deg,#7543d8,#a36dfc 52%,#8757e9);color:#fff;font-size:13px;font-weight:900;cursor:pointer;box-shadow:0 14px 34px rgba(121,72,220,.3),inset 0 1px 0 rgba(255,255,255,.18);transition:transform .16s ease,filter .16s ease,box-shadow .16s ease}.jackpot-join-v2:hover{filter:brightness(1.06);transform:translateY(-1px);box-shadow:0 18px 40px rgba(121,72,220,.36),inset 0 1px 0 rgba(255,255,255,.2)}.jackpot-join-v2 b{margin-left:8px;font-size:16px}.jackpot-bottom-v2{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-top:12px;color:#777a87;font-size:9px;font-weight:800}.jackpot-more-v2{border:0;background:transparent;color:#9381ae;font-size:9px;font-weight:800;cursor:pointer}.jackpot-more-v2:hover{color:#c4a1ff}.jackpot-split-v2{display:flex;align-items:center;gap:8px}.jackpot-split-v2 b:first-child{color:#a68acb}.jackpot-split-v2 b:last-child{color:#6f7280}@media(max-width:850px){.jackpot-vault-v2{right:-40px;opacity:.42}.jackpot-hero-copy-v2{max-width:73%}.jackpot-stats-grid-v2{grid-template-columns:1fr 1fr}.jackpot-contribution-v2{grid-column:1/-1}.jackpot-coming-soon-v2{margin-top:22px}}@media(max-width:600px){.jackpot-coming-soon-v2{align-items:flex-start;padding:14px 15px}.jackpot-coming-soon-icon-v2{width:40px;height:40px;flex-basis:40px}.jackpot-hero-section-v2{padding:24px 0 36px}.jackpot-hero-v2{padding:20px 17px;border-radius:17px}.jackpot-hero-top-v2{flex-direction:column}.jackpot-hero-copy-v2{max-width:100%}.jackpot-hero-copy-v2 h2{font-size:30px}.jackpot-vault-v2{right:-115px;top:42px;opacity:.18;transform:scale(.82)}.jackpot-draw-pill-v2{align-self:flex-start}.jackpot-stats-grid-v2{grid-template-columns:1fr 1fr;margin-top:24px}.jackpot-stat-v2 strong{font-size:20px}.jackpot-contribution-v2{grid-column:1/-1}.jackpot-countdown-v2{justify-content:flex-start}.jackpot-bottom-v2{flex-direction:column;align-items:flex-start;gap:8px}.jackpot-split-v2{align-self:flex-end}}`}</style>
-          <div className="jackpot-hero-v2">
-            <div className="jackpot-hero-top-v2">
-              <div className="jackpot-hero-copy-v2">
-                <span className="jackpot-hero-badge-v2"><i></i> COMING SOON</span>
-                <h2>Weekly Jackpot</h2>
-                <p>The Weekly Jackpot is coming soon. It will be added in 7 days.</p>
-              </div>
-              <span className="jackpot-draw-pill-v2"><i></i> Available in 7 days</span>
-            </div>
-            <div className="jackpot-vault-v2" aria-hidden="true">
-              <div className="jackpot-vault-glow-v2"></div>
-              <div className="jackpot-vault-platform-v2"></div>
-              <div className="jackpot-vault-body-v2"></div>
-              <div className="jackpot-vault-lid-v2"></div>
-              <div className="jackpot-vault-lock-v2"></div>
-              <div className="jackpot-coin-v2 c1"></div>
-              <div className="jackpot-coin-v2 c2"></div>
-              <div className="jackpot-coin-v2 c3"></div>
-              <div className="jackpot-coin-v2 c4"></div>
-            </div>
-            <div className="jackpot-coming-soon-v2">
-              <div className="jackpot-coming-soon-icon-v2">🔒</div>
+        <section id="jackpot" className="section jackpot-live-section">
+          <style>{`
+            .jackpot-live-section{
+              padding:36px 0 54px;
+            }
+            .jackpot-live-shell{
+              max-width:1120px;
+              margin:0 auto;
+              border:1px solid rgba(126,82,190,.42);
+              border-radius:24px;
+              overflow:hidden;
+              background:
+                radial-gradient(circle at 78% 0%, rgba(144,91,255,.16), transparent 34%),
+                linear-gradient(135deg,#101019,#08090f 74%);
+              box-shadow:0 24px 90px rgba(39,16,70,.26), inset 0 1px 0 rgba(255,255,255,.035);
+            }
+            .jackpot-live-header{
+              display:flex;
+              align-items:center;
+              justify-content:space-between;
+              gap:24px;
+              padding:28px 30px 24px;
+              border-bottom:1px solid rgba(255,255,255,.055);
+            }
+            .jackpot-live-kicker{
+              display:flex;
+              align-items:center;
+              gap:8px;
+              color:#9e7bcd;
+              font-size:9px;
+              font-weight:900;
+              letter-spacing:.14em;
+            }
+            .jackpot-live-dot{
+              width:7px;
+              height:7px;
+              border-radius:50%;
+              background:#7de4ad;
+              box-shadow:0 0 14px rgba(125,228,173,.75);
+            }
+            .jackpot-live-title{
+              margin:10px 0 6px;
+              color:#f6f2fb;
+              font-size:38px;
+              line-height:1;
+              letter-spacing:-.04em;
+            }
+            .jackpot-live-subtitle{
+              margin:0;
+              max-width:720px;
+              color:#858896;
+              font-size:12px;
+              font-weight:600;
+              line-height:1.55;
+            }
+            .jackpot-live-countdown{
+              min-width:210px;
+              padding:14px 16px;
+              border:1px solid rgba(134,91,188,.45);
+              border-radius:14px;
+              background:rgba(23,16,34,.72);
+              text-align:right;
+            }
+            .jackpot-live-countdown small{
+              display:block;
+              color:#747684;
+              font-size:8px;
+              font-weight:900;
+              letter-spacing:.13em;
+            }
+            .jackpot-live-countdown strong{
+              display:block;
+              margin-top:7px;
+              color:#c5a0ff;
+              font-size:21px;
+              letter-spacing:.02em;
+            }
+            .jackpot-live-main{
+              display:grid;
+              grid-template-columns:278px minmax(0,1fr);
+              min-height:525px;
+            }
+            .jackpot-live-sidebar{
+              padding:22px 16px 22px 18px;
+              border-right:1px solid rgba(255,255,255,.055);
+              background:rgba(6,7,12,.42);
+            }
+            .jackpot-live-sidebar-head{
+              display:flex;
+              align-items:center;
+              justify-content:space-between;
+              gap:12px;
+              margin-bottom:14px;
+            }
+            .jackpot-live-sidebar-head strong{
+              color:#f3eef9;
+              font-size:12px;
+              letter-spacing:.06em;
+            }
+            .jackpot-live-sidebar-head span{
+              color:#6f7180;
+              font-size:9px;
+              font-weight:800;
+            }
+            .jackpot-live-player-list{
+              display:flex;
+              flex-direction:column;
+              gap:8px;
+              max-height:470px;
+              overflow:auto;
+              padding-right:3px;
+            }
+            .jackpot-live-player{
+              display:grid;
+              grid-template-columns:34px minmax(0,1fr) auto;
+              align-items:center;
+              gap:10px;
+              padding:10px 10px;
+              border:1px solid rgba(255,255,255,.05);
+              border-radius:12px;
+              background:rgba(23,25,35,.7);
+            }
+            .jackpot-live-player.me{
+              border-color:rgba(164,117,239,.48);
+              background:linear-gradient(135deg,rgba(86,49,126,.32),rgba(22,23,32,.76));
+              box-shadow:inset 0 0 0 1px rgba(184,143,255,.05);
+            }
+            .jackpot-live-avatar{
+              width:34px;
+              height:34px;
+              display:grid;
+              place-items:center;
+              border-radius:10px;
+              background:linear-gradient(145deg,#8251dc,#302041);
+              color:#fff;
+              font-size:13px;
+              font-weight:900;
+            }
+            .jackpot-live-player-copy{
+              min-width:0;
+            }
+            .jackpot-live-player-copy strong{
+              display:block;
+              overflow:hidden;
+              color:#ece8f3;
+              font-size:11px;
+              font-weight:800;
+              text-overflow:ellipsis;
+              white-space:nowrap;
+            }
+            .jackpot-live-player-copy span{
+              display:block;
+              margin-top:3px;
+              color:#696d7a;
+              font-size:8px;
+              font-weight:800;
+            }
+            .jackpot-live-player-odds{
+              text-align:right;
+            }
+            .jackpot-live-player-odds strong{
+              display:block;
+              color:#8fe28f;
+              font-size:11px;
+              font-weight:900;
+            }
+            .jackpot-live-player-odds span{
+              display:block;
+              margin-top:3px;
+              color:#737684;
+              font-size:8px;
+              font-weight:800;
+            }
+            .jackpot-live-stage{
+              min-width:0;
+              position:relative;
+              display:flex;
+              flex-direction:column;
+              align-items:center;
+              justify-content:center;
+              padding:24px 28px 26px;
+              overflow:hidden;
+            }
+            .jackpot-live-stage:before{
+              content:"";
+              position:absolute;
+              inset:0;
+              background:
+                radial-gradient(circle at 50% 48%,rgba(140,85,255,.12),transparent 26%),
+                radial-gradient(circle at 50% 100%,rgba(86,46,140,.13),transparent 42%);
+              pointer-events:none;
+            }
+            .jackpot-live-pot-label{
+              position:relative;
+              z-index:2;
+              color:#7e7f8d;
+              font-size:9px;
+              font-weight:900;
+              letter-spacing:.16em;
+            }
+            .jackpot-live-pot{
+              position:relative;
+              z-index:2;
+              margin-top:5px;
+              color:#f3c85b;
+              font-size:40px;
+              line-height:1;
+              font-weight:950;
+              letter-spacing:-.045em;
+              text-shadow:0 0 24px rgba(243,200,91,.16);
+            }
+            .jackpot-live-wheel-wrap{
+              position:relative;
+              z-index:2;
+              width:min(100%,500px);
+              height:auto;
+              min-height:410px;
+              margin-top:16px;
+              display:flex;
+              align-items:center;
+              justify-content:center;
+              overflow:visible;
+            }
+            .jackpot-live-pointer{
+              position:absolute;
+              z-index:8;
+              top:14px;
+              left:50%;
+              width:0;
+              height:0;
+              transform:translateX(-50%);
+              border-left:12px solid transparent;
+              border-right:12px solid transparent;
+              border-top:25px solid #f3cb63;
+              filter:drop-shadow(0 0 10px rgba(243,203,99,.42));
+            }
+            .jackpot-wheel-modern{
+              position:relative;
+              width:min(100%,460px);
+              aspect-ratio:1/1;
+              display:grid;
+              place-items:center;
+              isolation:isolate;
+              filter:drop-shadow(0 28px 42px rgba(0,0,0,.38));
+            }
+            .jackpot-wheel-modern:before{
+              content:"";
+              position:absolute;
+              inset:7%;
+              border-radius:50%;
+              border:1px solid rgba(211,186,255,.12);
+              box-shadow:
+                0 0 0 1px rgba(122,77,184,.08),
+                0 0 42px rgba(126,72,220,.13),
+                inset 0 0 34px rgba(0,0,0,.35);
+              pointer-events:none;
+              z-index:1;
+            }
+            .jackpot-wheel-modern-glow{
+              position:absolute;
+              width:84%;
+              height:84%;
+              border-radius:50%;
+              background:
+                radial-gradient(circle,rgba(150,91,255,.24),transparent 51%),
+                radial-gradient(circle,rgba(103,72,184,.12),transparent 72%);
+              filter:blur(30px);
+              pointer-events:none;
+            }
+            .jackpot-wheel-modern-svg{
+              position:relative;
+              z-index:3;
+              width:100%;
+              height:100%;
+              overflow:visible;
+            }
+            .jackpot-wheel-modern.empty .jackpot-wheel-modern-svg{
+              opacity:.88;
+            }
+            .jackpot-live-wheel-label{
+              display:none;
+            }
+            .jackpot-live-actions{
+              position:relative;
+              z-index:3;
+              display:grid;
+              grid-template-columns:1.15fr 1fr;
+              gap:10px;
+              width:min(100%,540px);
+              margin-top:14px;
+            }
+            .jackpot-live-action{
+              min-height:50px;
+              border:1px solid rgba(155,111,216,.50);
+              border-radius:13px;
+              background:linear-gradient(100deg,#3a234f,#21172e);
+              color:#eee9f5;
+              font-size:12px;
+              font-weight:900;
+              cursor:pointer;
+              transition:transform .16s ease,filter .16s ease,border-color .16s ease;
+            }
+            .jackpot-live-action.primary{
+              border-color:#a57aef;
+              background:linear-gradient(100deg,#7543d8,#a36dfc);
+              box-shadow:0 14px 34px rgba(121,72,220,.24);
+            }
+            .jackpot-live-action:hover{
+              transform:translateY(-1px);
+              filter:brightness(1.06);
+            }
+            .jackpot-live-my{
+              position:relative;
+              z-index:3;
+              margin-top:12px;
+              color:#777985;
+              font-size:9px;
+              font-weight:800;
+              text-align:center;
+            }
+            .jackpot-live-my b{
+              color:#b895ef;
+            }
+            .jackpot-live-empty{
+              padding:30px 12px;
+              text-align:center;
+              color:#6e7180;
+              font-size:10px;
+              font-weight:700;
+            }
+            .jackpot-live-entry-backdrop{
+              position:fixed;
+              inset:0;
+              z-index:2200;
+              display:flex;
+              align-items:center;
+              justify-content:center;
+              padding:20px;
+              background:rgba(4,5,9,.76);
+              backdrop-filter:blur(10px);
+            }
+            .jackpot-live-entry-modal{
+              position:relative;
+              width:min(100%,540px);
+              max-height:min(86vh,760px);
+              overflow:auto;
+              padding:26px;
+              border:1px solid rgba(151,104,221,.5);
+              border-radius:20px;
+              background:linear-gradient(145deg,#171320,#090a10);
+              box-shadow:0 30px 100px rgba(0,0,0,.55);
+            }
+            .jackpot-live-entry-close{
+              position:absolute;
+              top:14px;
+              right:16px;
+              width:34px;
+              height:34px;
+              border:1px solid rgba(255,255,255,.09);
+              border-radius:10px;
+              background:rgba(255,255,255,.025);
+              color:#8b8c99;
+              font-size:20px;
+              cursor:pointer;
+            }
+            .jackpot-live-entry-close:hover{
+              color:#fff;
+              background:rgba(255,255,255,.06);
+            }
+            .jackpot-live-entry-modal h2{
+              margin:8px 0 7px;
+              color:#f5f1fa;
+              font-size:28px;
+            }
+            .jackpot-live-entry-modal>p{
+              margin:0;
+              color:#828592;
+              font-size:11px;
+              line-height:1.55;
+            }
+            .jackpot-live-mode{
+              display:grid;
+              grid-template-columns:1.15fr 1fr;
+              gap:8px;
+              margin:20px 0 16px;
+            }
+            .jackpot-live-mode button{
+              min-height:44px;
+              border:1px solid rgba(255,255,255,.08);
+              border-radius:11px;
+              background:#11131b;
+              color:#848795;
+              font-size:10px;
+              font-weight:900;
+              cursor:pointer;
+            }
+            .jackpot-live-mode button.active{
+              border-color:rgba(161,119,235,.6);
+              background:rgba(108,68,158,.2);
+              color:#d4b8ff;
+            }
+            .jackpot-live-field{
+              display:block;
+              margin-top:8px;
+            }
+            .jackpot-live-field span{
+              display:block;
+              margin-bottom:7px;
+              color:#838592;
+              font-size:9px;
+              font-weight:900;
+              letter-spacing:.08em;
+            }
+            .jackpot-live-field input{
+              width:100%;
+              height:48px;
+              border:1px solid rgba(255,255,255,.09);
+              border-radius:11px;
+              padding:0 13px;
+              background:#0d0f16;
+              color:#f4f2f7;
+              font-size:15px;
+              font-weight:800;
+              outline:none;
+            }
+            .jackpot-live-field input:focus{
+              border-color:rgba(162,120,234,.65);
+              box-shadow:0 0 0 3px rgba(142,90,229,.12);
+            }
+            .jackpot-live-selection-head{
+              display:flex;
+              align-items:center;
+              justify-content:space-between;
+              gap:10px;
+              margin:12px 0 9px;
+            }
+            .jackpot-live-selection-head strong{
+              color:#ebe7f2;
+              font-size:10px;
+            }
+            .jackpot-live-selection-head span{
+              color:#b895ef;
+              font-size:10px;
+              font-weight:900;
+            }
+            .jackpot-live-brainrot-list{
+              display:grid;
+              grid-template-columns:1.15fr 1fr;
+              gap:8px;
+              max-height:360px;
+              overflow:auto;
+            }
+            .jackpot-live-brainrot{
+              display:flex;
+              align-items:center;
+              gap:9px;
+              padding:8px;
+              border:1px solid rgba(255,255,255,.07);
+              border-radius:11px;
+              background:#10121a;
+              cursor:pointer;
+              text-align:left;
+            }
+            .jackpot-live-brainrot.selected{
+              border-color:rgba(159,115,231,.62);
+              background:rgba(88,52,134,.22);
+            }
+            .jackpot-live-brainrot-art{
+              width:42px;
+              height:42px;
+              flex:0 0 42px;
+              display:grid;
+              place-items:center;
+              border-radius:9px;
+              border:1px solid rgba(255,255,255,.06);
+              background:#0a0c12;
+              overflow:hidden;
+            }
+            .jackpot-live-brainrot-copy{
+              min-width:0;
+            }
+            .jackpot-live-brainrot-copy strong{
+              display:block;
+              overflow:hidden;
+              color:#eeebf4;
+              font-size:9px;
+              font-weight:800;
+              text-overflow:ellipsis;
+              white-space:nowrap;
+            }
+            .jackpot-live-brainrot-copy span{
+              display:block;
+              margin-top:3px;
+              color:#8fe28f;
+              font-size:8px;
+              font-weight:900;
+            }
+            .jackpot-live-error{
+              margin-top:12px;
+              padding:10px 11px;
+              border:1px solid rgba(239,108,108,.26);
+              border-radius:10px;
+              background:rgba(130,32,38,.14);
+              color:#ffaaa9;
+              font-size:9px;
+              font-weight:800;
+            }
+            .jackpot-live-submit{
+              width:100%;
+              min-height:50px;
+              margin-top:14px;
+              border:1px solid #aa7bf6;
+              border-radius:11px;
+              background:linear-gradient(100deg,#7442d6,#a36dfc);
+              color:#fff;
+              font-size:11px;
+              font-weight:900;
+              cursor:pointer;
+            }
+            .jackpot-live-submit:disabled{
+              opacity:.55;
+              cursor:not-allowed;
+            }
+            @media(max-width:900px){
+              .jackpot-live-main{
+                grid-template-columns:1fr;
+              }
+              .jackpot-live-sidebar{
+                border-right:0;
+                border-bottom:1px solid rgba(255,255,255,.055);
+              }
+              .jackpot-live-player-list{
+                display:grid;
+                grid-template-columns:1.15fr 1fr;
+                max-height:280px;
+              }
+              .jackpot-live-stage{
+                min-height:560px;
+              }
+            }
+            @media(max-width:650px){
+              .jackpot-live-header{
+                flex-direction:column;
+                align-items:flex-start;
+                padding:22px 18px;
+              }
+              .jackpot-live-countdown{
+                width:100%;
+                min-width:0;
+                text-align:left;
+              }
+              .jackpot-live-title{
+                font-size:30px;
+              }
+              .jackpot-live-stage{
+                padding:22px 14px 26px;
+              }
+              .jackpot-live-pot{
+                font-size:34px;
+              }
+              .jackpot-live-wheel-wrap{
+                min-height:320px;
+              }
+              .jackpot-wheel-modern{
+                width:min(100%,380px);
+              }
+              .jackpot-live-actions{
+                grid-template-columns:1fr;
+                width:100%;
+              }
+              .jackpot-live-brainrot-list,
+              .jackpot-live-player-list{
+                grid-template-columns:1fr;
+              }
+            }
+          `}</style>
+
+          <div className="jackpot-live-shell">
+            <div className="jackpot-live-header">
               <div>
-                <small>WEEKLY JACKPOT</small>
-                <strong>Launching in 7 days</strong>
-                <span>The jackpot is locked while we finish preparing the first draw.</span>
+                <div className="jackpot-live-kicker">
+                  <i className="jackpot-live-dot"></i>
+                  LIVE DAILY JACKPOT
+                </div>
+                <h2 className="jackpot-live-title">Daily Jackpot</h2>
+                <p className="jackpot-live-subtitle">
+                  Contribute from your CASEX balance or enter with Brainrots
+                  from your inventory. Your share of the pot determines your odds.
+                </p>
+              </div>
+
+              <div className="jackpot-live-countdown">
+                <small>DRAW ENDS IN</small>
+                <strong>
+                  {jackpotData
+                    ? `${String(jackpotTimeLeft.days).padStart(2, "0")}d ${String(
+                        jackpotTimeLeft.hours
+                      ).padStart(2, "0")}h ${String(
+                        jackpotTimeLeft.minutes
+                      ).padStart(2, "0")}m ${String(
+                        jackpotTimeLeft.seconds
+                      ).padStart(2, "0")}s`
+                    : "Loading..."}
+                </strong>
               </div>
             </div>
-            <button
-              type="button"
-              className="jackpot-join-v2 jackpot-join-locked"
-              disabled
-            >
-              🔒 Coming in 7 days
-            </button>
-            <div className="jackpot-bottom-v2">
-              <button
-                type="button"
-                className="jackpot-more-v2"
-                onClick={() => alert("The Weekly Jackpot is currently locked and will be added in 7 days.")}
-              >
-                More details ↓
-              </button>
-              <div className="jackpot-split-v2">
-                <b>95% to winner</b>
-                <span>•</span>
-                <b>5% to house</b>
+
+            <div className="jackpot-live-main">
+              <aside className="jackpot-live-sidebar">
+                <div className="jackpot-live-sidebar-head">
+                  <strong>PLAYERS</strong>
+                  <span>
+                    {jackpotPlayers.length}{" "}
+                    {jackpotPlayers.length === 1 ? "player" : "players"}
+                  </span>
+                </div>
+
+                <div className="jackpot-live-player-list">
+                  {jackpotLoading && !jackpotPlayers.length ? (
+                    <div className="jackpot-live-empty">
+                      Loading live players...
+                    </div>
+                  ) : jackpotPlayers.length ? (
+                    jackpotPlayers.map((player) => {
+                      const username = String(
+                        player.username || "Player"
+                      );
+                      const isMe =
+                        Number(player.userId) === Number(authUser?.id);
+
+                      return (
+                        <div
+                          key={player.userId}
+                          className={`jackpot-live-player ${
+                            isMe ? "me" : ""
+                          }`}
+                        >
+                          <div className="jackpot-live-avatar">
+                            {username.charAt(0).toUpperCase()}
+                          </div>
+
+                          <div className="jackpot-live-player-copy">
+                            <strong>{username}</strong>
+                            <span>
+                              ${(
+                                Number(player.contributionCents || 0) /
+                                100
+                              ).toFixed(2)}
+                            </span>
+                          </div>
+
+                          <div className="jackpot-live-player-odds">
+                            <strong>
+                              {Number(player.odds || 0).toFixed(2)}%
+                            </strong>
+                            <span>
+                              {Number(player.contributionCount || 0)}{" "}
+                              {Number(player.contributionCount || 0) === 1
+                                ? "entry"
+                                : "entries"}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="jackpot-live-empty">
+                      No entries yet. Be the first player.
+                    </div>
+                  )}
+                </div>
+              </aside>
+
+              <div className="jackpot-live-stage">
+                <div className="jackpot-live-pot-label">
+                  JACKPOT VALUE
+                </div>
+
+                <div className="jackpot-live-pot">
+                  ${(jackpotPotCents / 100).toFixed(2)}
+                </div>
+
+                <div className="jackpot-live-wheel-wrap" aria-label="Jackpot wheel">
+                  <div className="jackpot-live-pointer"></div>
+
+                  <JackpotWheel
+                    players={jackpotPlayers}
+                    totalCents={jackpotPotCents}
+                  />
+                </div>
+
+                <div className="jackpot-live-actions">
+                  <button
+                    type="button"
+                    className="jackpot-live-action primary"
+                    onClick={() => openJackpotEntry("balance")}
+                  >
+                    💰 Enter with CASEX balance
+                  </button>
+
+                  <button
+                    type="button"
+                    className="jackpot-live-action"
+                    onClick={() => openJackpotEntry("brainrots")}
+                  >
+                    ◇ Enter with Brainrots
+                  </button>
+                </div>
+
+                <div className="jackpot-live-my">
+                  {authUser ? (
+                    <>
+                      Your contribution:{" "}
+                      <b>${(jackpotMyContributionCents / 100).toFixed(2)}</b>
+                      {" · "}
+                      Your odds:{" "}
+                      <b>{jackpotMyOdds.toFixed(2)}%</b>
+                    </>
+                  ) : (
+                    <>
+                      Sign in to enter the jackpot. Minimum contribution is{" "}
+                      <b>$0.10</b>.
+                    </>
+                  )}
+                </div>
               </div>
             </div>
           </div>
         </section>
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        <section
+<section
           id="cases"
           className="section"
         >
@@ -7692,6 +8941,168 @@ setSellConfirmItem({
                 </p>
               </section>
             </div>
+          </div>
+        </div>
+      )}
+
+      {jackpotEntryOpen && authUser && (
+        <div
+          className="jackpot-live-entry-backdrop"
+          onClick={() => !jackpotEntryLoading && closeJackpotEntry()}
+        >
+          <div
+            className="jackpot-live-entry-modal"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="jackpot-live-entry-close"
+              onClick={closeJackpotEntry}
+              disabled={jackpotEntryLoading}
+              aria-label="Close jackpot entry"
+            >
+              ×
+            </button>
+
+            <div className="eyebrow">DAILY JACKPOT</div>
+            <h2>Enter the jackpot</h2>
+            <p>
+              Add any amount from $0.10 with no maximum, or contribute
+              Brainrots directly from your inventory.
+            </p>
+
+            <div className="jackpot-live-mode">
+              <button
+                type="button"
+                className={jackpotEntryMode === "balance" ? "active" : ""}
+                onClick={() => {
+                  if (jackpotEntryLoading) return;
+                  setJackpotEntryMode("balance");
+                  setJackpotEntryError("");
+                  setJackpotSelectedInventoryIds(new Set());
+                }}
+              >
+                💰 CASEX Balance
+              </button>
+
+              <button
+                type="button"
+                className={jackpotEntryMode === "brainrots" ? "active" : ""}
+                onClick={() => {
+                  if (jackpotEntryLoading) return;
+                  setJackpotEntryMode("brainrots");
+                  setJackpotEntryError("");
+                  setJackpotAmount("");
+                }}
+              >
+                ◇ Brainrots
+              </button>
+            </div>
+
+            {jackpotEntryMode === "balance" ? (
+              <>
+                <label className="jackpot-live-field">
+                  <span>CONTRIBUTION AMOUNT · MINIMUM $0.10 · NO MAXIMUM</span>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    min="0.10"
+                    step="0.01"
+                    value={jackpotAmount}
+                    onChange={(event) => {
+                      setJackpotAmount(event.target.value);
+                      setJackpotEntryError("");
+                    }}
+                    placeholder="25.00"
+                    disabled={jackpotEntryLoading}
+                  />
+                </label>
+
+                <button
+                  type="button"
+                  className="jackpot-live-submit"
+                  onClick={enterJackpotWithBalance}
+                  disabled={jackpotEntryLoading}
+                >
+                  {jackpotEntryLoading ? "Entering..." : "Enter Jackpot"}
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="jackpot-live-selection-head">
+                  <strong>Select Brainrots</strong>
+                  <span>
+                    ${(jackpotSelectedValueCents / 100).toFixed(2)}
+                  </span>
+                </div>
+
+                <div className="jackpot-live-brainrot-list">
+                  {jackpotAvailableInventory.length === 0 ? (
+                    <div className="jackpot-live-empty">
+                      You have no available Brainrots in your inventory.
+                    </div>
+                  ) : (
+                    jackpotAvailableInventory.map((item) => {
+                      const selectedItem = jackpotSelectedInventoryIds.has(
+                        Number(item.id)
+                      );
+
+                      return (
+                        <button
+                          type="button"
+                          key={item.id}
+                          className={`jackpot-live-brainrot ${
+                            selectedItem ? "selected" : ""
+                          }`}
+                          onClick={() =>
+                            toggleJackpotInventoryItem(item.id)
+                          }
+                          disabled={jackpotEntryLoading}
+                        >
+                          <span className="jackpot-live-brainrot-art">
+                            <ItemArt
+                              rarity={item.rarity}
+                              imageUrl={item.image_url || item.imageUrl}
+                              compact
+                            />
+                          </span>
+
+                          <span className="jackpot-live-brainrot-copy">
+                            <strong>{item.name || "Brainrot"}</strong>
+                            <span>
+                              ${(Number(item.value_cents || 0) / 100).toFixed(2)}
+                            </span>
+                          </span>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  className="jackpot-live-submit"
+                  onClick={enterJackpotWithBrainrots}
+                  disabled={
+                    jackpotEntryLoading ||
+                    !jackpotSelectedInventoryIds.size
+                  }
+                >
+                  {jackpotEntryLoading
+                    ? "Adding Brainrots..."
+                    : `Enter with $${(
+                        jackpotSelectedValueCents /
+                        100
+                      ).toFixed(2)} in Brainrots`}
+                </button>
+              </>
+            )}
+
+            {jackpotEntryError && (
+              <div className="jackpot-live-error">
+                {jackpotEntryError}
+              </div>
+            )}
           </div>
         </div>
       )}
