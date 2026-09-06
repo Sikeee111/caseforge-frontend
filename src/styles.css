@@ -24504,3 +24504,34 @@ a:focus-visible{
 
 /* Brainrot deposit admin */
 .admin-command-card.brainrot-deposits .admin-command-icon{color:#b084ff;background:rgba(176,132,255,.11)}.admin-brainrot-deposits-table{min-width:1450px}.admin-brainrot-code{display:inline-block;padding:7px 9px;border:1px solid rgba(176,132,255,.25);border-radius:8px;background:rgba(176,132,255,.07);color:#c7a9ff;font-size:11px}.admin-brainrot-textarea{width:220px;min-height:64px;resize:vertical;padding:9px 10px;border:1px solid rgba(255,255,255,.09);border-radius:9px;background:rgba(255,255,255,.025);color:#ebe8f2;font:500 11px/1.45 inherit;outline:none}.admin-brainrot-amount-wrap{display:flex;align-items:center;gap:6px;min-width:120px;padding:8px 9px;border:1px solid rgba(255,255,255,.09);border-radius:9px;background:rgba(255,255,255,.025)}.admin-brainrot-amount-wrap span{color:#8f8ca0}.admin-brainrot-amount-wrap input{width:100%;border:0;outline:0;background:transparent;color:#eeeaf7;font:700 12px inherit}
+
+/* =========================================================
+   PASSWORD RESET AUTH UI
+   ========================================================= */
+
+.auth-forgot{
+  width:100%;
+  margin-top:2px;
+  padding:0;
+  border:0;
+  background:transparent;
+  color:#8f72d9;
+  font-size:11px;
+  font-weight:700;
+  cursor:pointer;
+  transition:color .16s ease;
+}
+
+.auth-forgot:hover{
+  color:#b59aff;
+}
+
+.auth-success{
+  padding:11px 12px;
+  border:1px solid rgba(100,220,150,.28);
+  border-radius:10px;
+  background:rgba(100,220,150,.08);
+  color:#8ff0b0;
+  font-size:11px;
+  line-height:1.5;
+}

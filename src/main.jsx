@@ -1139,18 +1139,28 @@ function App() {
     confirmPassword: "",
   });
 
-  const [authOpen, setAuthOpen] = useState(false);
-  const [authMode, setAuthMode] = useState("login");
-  const [authLoading, setAuthLoading] = useState(false);
-  const [authError, setAuthError] = useState("");
+const [authOpen, setAuthOpen] = useState(false);
+const [authMode, setAuthMode] = useState("login");
+const [authLoading, setAuthLoading] = useState(false);
+const [authError, setAuthError] = useState("");
+const [authSuccess, setAuthSuccess] = useState("");
 
-  const [authForm, setAuthForm] = useState({
-    username: "",
-    email: "",
-    identifier: "",
-    password: "",
-    creatorCode: "",
-  });
+const [forgotPasswordEmail, setForgotPasswordEmail] = useState("");
+
+const [resetPasswordToken, setResetPasswordToken] = useState("");
+
+const [resetPasswordForm, setResetPasswordForm] = useState({
+  password: "",
+  confirmPassword: "",
+});
+
+const [authForm, setAuthForm] = useState({
+  username: "",
+  email: "",
+  identifier: "",
+  password: "",
+  creatorCode: "",
+});
 
   const reelTrackRef = useRef(null);
   const reelWindowRef = useRef(null);
@@ -1819,6 +1829,26 @@ function App() {
   }, [authUser?.id]);
 
   useEffect(() => {
+  const params = new URLSearchParams(
+    window.location.search
+  );
+
+  const token = params.get("token");
+
+  if (!token) return;
+
+  setResetPasswordToken(token);
+  setResetPasswordForm({
+    password: "",
+    confirmPassword: "",
+  });
+  setAuthMode("reset");
+  setAuthError("");
+  setAuthSuccess("");
+  setAuthOpen(true);
+}, []);
+
+  useEffect(() => {
     const handleProfileOutsideClick = (event) => {
       if (
         profileRef.current &&
@@ -1841,21 +1871,31 @@ function App() {
     };
   }, []);
 
-  const openAuth = (mode = "login") => {
-    setAuthMode(mode);
-    setAuthError("");
+const openAuth = (mode = "login") => {
+  setAuthMode(mode);
+  setAuthError("");
+  setAuthSuccess("");
 
-    setAuthForm({
-      username: "",
-      email: "",
-      identifier: "",
-      password: "",
-      creatorCode: "",
-    });
+  setForgotPasswordEmail("");
 
-    setAuthOpen(true);
-    setProfileOpen(false);
-  };
+  setResetPasswordToken("");
+
+  setResetPasswordForm({
+    password: "",
+    confirmPassword: "",
+  });
+
+  setAuthForm({
+    username: "",
+    email: "",
+    identifier: "",
+    password: "",
+    creatorCode: "",
+  });
+
+  setAuthOpen(true);
+  setProfileOpen(false);
+};
 
   const handleAuthSubmit = async (event) => {
     event.preventDefault();
@@ -1920,6 +1960,180 @@ function App() {
     } catch (error) {
       console.error("Authentication failed:", error);
       setAuthError(error.message);
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async (event) => {
+    event.preventDefault();
+
+    if (authLoading) return;
+
+    const email = String(
+      forgotPasswordEmail || ""
+    ).trim();
+
+    if (!email) {
+      setAuthError("Enter your account email.");
+      setAuthSuccess("");
+      return;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setAuthError("Enter a valid email address.");
+      setAuthSuccess("");
+      return;
+    }
+
+    setAuthLoading(true);
+    setAuthError("");
+    setAuthSuccess("");
+
+    try {
+      const response = await apiFetch(
+        `${API}/api/auth/forgot-password`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            email,
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message ||
+            data.error?.replaceAll("_", " ").toLowerCase() ||
+            "Failed to request password reset"
+        );
+      }
+
+      setAuthSuccess(
+        "If an account with that email exists, a password reset link has been sent."
+      );
+    } catch (error) {
+      console.error(
+        "Forgot password request failed:",
+        error
+      );
+
+      setAuthError(
+        error.message ||
+          "Failed to request password reset."
+      );
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleResetPassword = async (event) => {
+    event.preventDefault();
+
+    if (authLoading) return;
+
+    const password = String(
+      resetPasswordForm.password || ""
+    );
+
+    const confirmPassword = String(
+      resetPasswordForm.confirmPassword || ""
+    );
+
+    if (!resetPasswordToken) {
+      setAuthError(
+        "This password reset link is invalid or has expired."
+      );
+      setAuthSuccess("");
+      return;
+    }
+
+    if (password.length < 8) {
+      setAuthError(
+        "Your new password must be at least 8 characters."
+      );
+      setAuthSuccess("");
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setAuthError(
+        "Your new passwords do not match."
+      );
+      setAuthSuccess("");
+      return;
+    }
+
+    setAuthLoading(true);
+    setAuthError("");
+    setAuthSuccess("");
+
+    try {
+      const response = await apiFetch(
+        `${API}/api/auth/reset-password`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            token: resetPasswordToken,
+            newPassword: password,
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message ||
+            data.error?.replaceAll("_", " ").toLowerCase() ||
+            "Failed to reset password"
+        );
+      }
+
+      setResetPasswordForm({
+        password: "",
+        confirmPassword: "",
+      });
+
+      setResetPasswordToken("");
+
+      setAuthMode("login");
+
+      setAuthForm({
+        username: "",
+        email: "",
+        identifier: "",
+        password: "",
+        creatorCode: "",
+      });
+
+      setAuthSuccess(
+        "Password reset successfully. You can now sign in with your new password."
+      );
+
+      window.history.replaceState(
+        {},
+        document.title,
+        window.location.pathname
+      );
+    } catch (error) {
+      console.error(
+        "Password reset failed:",
+        error
+      );
+
+      setAuthError(
+        error.message ||
+          "Failed to reset password."
+      );
     } finally {
       setAuthLoading(false);
     }
@@ -9413,258 +9627,360 @@ setSellConfirmItem({
             </button>
 
             <div className="eyebrow">
-              {authMode === "login"
+              {authMode === "reset"
+                ? "PASSWORD RESET"
+                : authMode === "forgot"
+                ? "ACCOUNT RECOVERY"
+                : authMode === "login"
                 ? "WELCOME BACK"
                 : "JOIN CaseX"}
             </div>
 
             <h2>
-              {authMode === "login"
+              {authMode === "reset"
+                ? "Choose a new password"
+                : authMode === "forgot"
+                ? "Forgot your password?"
+                : authMode === "login"
                 ? "Sign in to your account"
                 : "Create your account"}
             </h2>
 
             <p className="auth-subtitle">
-              {authMode === "login"
+              {authMode === "reset"
+                ? "Enter a new password for your account."
+                : authMode === "forgot"
+                ? "Enter your email and we'll send you a link to reset your password."
+                : authMode === "login"
                 ? "Your wallet, inventory and history are tied to your account."
                 : "Create an account to save your wallet, inventory and case history."}
             </p>
 
-            <form
-              onSubmit={
-                handleAuthSubmit
-              }
-              className="auth-form"
-            >
-              {authMode ===
-              "register" ? (
-                <>
+            {authMode === "forgot" ? (
+              <form
+                onSubmit={handleForgotPassword}
+                className="auth-form"
+              >
+                <label>
+                  <span>Email</span>
+
+                  <input
+                    type="email"
+                    value={forgotPasswordEmail}
+                    onChange={(event) =>
+                      setForgotPasswordEmail(
+                        event.target.value
+                      )
+                    }
+                    placeholder="you@example.com"
+                    autoComplete="email"
+                    required
+                  />
+                </label>
+
+                {authError && (
+                  <div className="auth-error">
+                    {authError}
+                  </div>
+                )}
+
+                {authSuccess && (
+                  <div className="auth-success">
+                    {authSuccess}
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  className="primary auth-submit"
+                  disabled={authLoading}
+                >
+                  {authLoading
+                    ? "Sending..."
+                    : "Send reset link"}
+                </button>
+              </form>
+            ) : authMode === "reset" ? (
+              <form
+                onSubmit={handleResetPassword}
+                className="auth-form"
+              >
+                <label>
+                  <span>New password</span>
+
+                  <input
+                    type="password"
+                    value={resetPasswordForm.password}
+                    onChange={(event) =>
+                      setResetPasswordForm(
+                        (current) => ({
+                          ...current,
+                          password:
+                            event.target.value,
+                        })
+                      )
+                    }
+                    placeholder="At least 8 characters"
+                    autoComplete="new-password"
+                    minLength={8}
+                    required
+                  />
+                </label>
+
+                <label>
+                  <span>Confirm new password</span>
+
+                  <input
+                    type="password"
+                    value={
+                      resetPasswordForm.confirmPassword
+                    }
+                    onChange={(event) =>
+                      setResetPasswordForm(
+                        (current) => ({
+                          ...current,
+                          confirmPassword:
+                            event.target.value,
+                        })
+                      )
+                    }
+                    placeholder="Enter your password again"
+                    autoComplete="new-password"
+                    minLength={8}
+                    required
+                  />
+                </label>
+
+                {authError && (
+                  <div className="auth-error">
+                    {authError}
+                  </div>
+                )}
+
+                {authSuccess && (
+                  <div className="auth-success">
+                    {authSuccess}
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  className="primary auth-submit"
+                  disabled={authLoading}
+                >
+                  {authLoading
+                    ? "Resetting..."
+                    : "Reset password"}
+                </button>
+              </form>
+            ) : (
+              <form
+                onSubmit={handleAuthSubmit}
+                className="auth-form"
+              >
+                {authMode === "register" ? (
+                  <>
+                    <label>
+                      <span>Username</span>
+
+                      <input
+                        type="text"
+                        value={authForm.username}
+                        onChange={(event) =>
+                          setAuthForm(
+                            (current) => ({
+                              ...current,
+                              username:
+                                event.target.value,
+                            })
+                          )
+                        }
+                        placeholder="e.g. User123"
+                        autoComplete="username"
+                        required
+                      />
+                    </label>
+
+                    <label>
+                      <span>Email</span>
+
+                      <input
+                        type="email"
+                        value={authForm.email}
+                        onChange={(event) =>
+                          setAuthForm(
+                            (current) => ({
+                              ...current,
+                              email:
+                                event.target.value,
+                            })
+                          )
+                        }
+                        placeholder="you@example.com"
+                        autoComplete="email"
+                        required
+                      />
+                    </label>
+
+                    <label>
+                      <span>
+                        Creator Code{" "}
+                        <small>(optional)</small>
+                      </span>
+
+                      <input
+                        type="text"
+                        value={authForm.creatorCode}
+                        onChange={(event) =>
+                          setAuthForm(
+                            (current) => ({
+                              ...current,
+                              creatorCode:
+                                event.target.value,
+                            })
+                          )
+                        }
+                        placeholder="e.g. SIKE"
+                        autoComplete="off"
+                      />
+                    </label>
+                  </>
+                ) : (
                   <label>
-                    <span>
-                      Username
-                    </span>
+                    <span>Username or email</span>
 
                     <input
                       type="text"
-                      value={
-                        authForm.username
-                      }
-                      onChange={(
-                        event
-                      ) =>
+                      value={authForm.identifier}
+                      onChange={(event) =>
                         setAuthForm(
-                          (
-                            current
-                          ) => ({
+                          (current) => ({
                             ...current,
-                            username:
-                              event
-                                .target
-                                .value,
+                            identifier:
+                              event.target.value,
                           })
                         )
                       }
-                      placeholder="e.g. User123"
+                      placeholder="Username or email"
                       autoComplete="username"
                       required
                     />
                   </label>
+                )}
 
-                  <label>
-                    <span>
-                      Email
-                    </span>
-
-                    <input
-                      type="email"
-                      value={
-                        authForm.email
-                      }
-                      onChange={(
-                        event
-                      ) =>
-                        setAuthForm(
-                          (
-                            current
-                          ) => ({
-                            ...current,
-                            email:
-                              event
-                                .target
-                                .value,
-                          })
-                        )
-                      }
-                      placeholder="you@example.com"
-                      autoComplete="email"
-                      required
-                    />
-                  </label>
-
-<label>
-  <span>
-    Creator Code <small>(optional)</small>
-  </span>
-
-  <input
-    type="text"
-    value={authForm.creatorCode}
-    onChange={(event) =>
-      setAuthForm((current) => ({
-        ...current,
-        creatorCode: event.target.value,
-      }))
-    }
-    placeholder="e.g. SIKE"
-    autoComplete="off"
-  />
-</label>
-
-
-                </>
-              ) : (
                 <label>
-                  <span>
-                    Username or email
-                  </span>
+                  <span>Password</span>
 
                   <input
-                    type="text"
-                    value={
-                      authForm.identifier
-                    }
-                    onChange={(
-                      event
-                    ) =>
+                    type="password"
+                    value={authForm.password}
+                    onChange={(event) =>
                       setAuthForm(
-                        (
-                          current
-                        ) => ({
+                        (current) => ({
                           ...current,
-                          identifier:
-                            event
-                              .target
-                              .value,
+                          password:
+                            event.target.value,
                         })
                       )
                     }
-                    placeholder="Username or email"
-                    autoComplete="username"
+                    placeholder="At least 8 characters"
+                    autoComplete={
+                      authMode === "login"
+                        ? "current-password"
+                        : "new-password"
+                    }
+                    minLength={8}
                     required
                   />
                 </label>
-              )}
 
-              <label>
-                <span>
-                  Password
-                </span>
+                {authError && (
+                  <div className="auth-error">
+                    {authError}
+                  </div>
+                )}
 
-                <input
-                  type="password"
-                  value={
-                    authForm.password
-                  }
-                  onChange={(
-                    event
-                  ) =>
-                    setAuthForm(
-                      (
-                        current
-                      ) => ({
-                        ...current,
-                        password:
-                          event
-                            .target
-                            .value,
-                      })
-                    )
-                  }
-                  placeholder="At least 8 characters"
-                  autoComplete={
-                    authMode ===
-                    "login"
-                      ? "current-password"
-                      : "new-password"
-                  }
-                  minLength={8}
-                  required
-                />
-              </label>
+                <button
+                  type="submit"
+                  className="primary auth-submit"
+                  disabled={authLoading}
+                >
+                  {authLoading
+                    ? "Please wait..."
+                    : authMode === "login"
+                    ? "Sign in"
+                    : "Create account"}
+                </button>
 
-              {authError && (
-                <div className="auth-error">
-                  {authError}
-                </div>
-              )}
-
-              <button
-                type="submit"
-                className="primary auth-submit"
-                disabled={
-                  authLoading
-                }
-              >
-                {authLoading
-                  ? "Please wait..."
-                  : authMode ===
-                    "login"
-                  ? "Sign in"
-                  : "Create account"}
-              </button>
-            </form>
+                {authMode === "login" && (
+                  <button
+                    type="button"
+                    className="auth-forgot"
+                    onClick={() => {
+                      setAuthMode("forgot");
+                      setAuthError("");
+                      setAuthSuccess("");
+                    }}
+                  >
+                    Forgot password?
+                  </button>
+                )}
+              </form>
+            )}
 
             <div className="auth-switch">
-              {authMode ===
-              "login" ? (
+              {authMode === "login" ? (
                 <>
-                  Don't have an
-                  account?
+                  Don't have an account?
 
                   <button
                     type="button"
                     onClick={() => {
-                      setAuthMode(
-                        "register"
-                      );
-
-                      setAuthError(
-                        ""
-                      );
+                      setAuthMode("register");
+                      setAuthError("");
+                      setAuthSuccess("");
                     }}
                   >
                     Create one
                   </button>
                 </>
-              ) : (
+              ) : authMode === "register" ? (
                 <>
-                  Already have an
-                  account?
+                  Already have an account?
 
                   <button
                     type="button"
                     onClick={() => {
-                      setAuthMode(
-                        "login"
-                      );
-
-                      setAuthError(
-                        ""
-                      );
+                      setAuthMode("login");
+                      setAuthError("");
+                      setAuthSuccess("");
                     }}
                   >
                     Sign in
                   </button>
                 </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAuthMode("login");
+                      setAuthError("");
+                      setAuthSuccess("");
+                    }}
+                  >
+                    ← Back to sign in
+                  </button>
+                </>
               )}
             </div>
 
-            <p className="auth-demo-note">
-              Demo environment: new
-              accounts start with a
-              $100.00 server-side wallet
-              balance.
-            </p>
+            {authMode !== "reset" && (
+              <p className="auth-demo-note">
+                Demo environment: new accounts start with a
+                $100.00 server-side wallet balance.
+              </p>
+            )}
           </div>
         </div>
       )}
