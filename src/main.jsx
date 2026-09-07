@@ -4111,6 +4111,26 @@ useEffect(() => {
         </nav>
 
 <div className="nav-actions">
+  <a
+  href="https://discord.gg/7hsugeanWk"
+  target="_blank"
+  rel="noopener noreferrer"
+  className="discord-nav-button"
+>
+<span className="discord-nav-icon">
+  <svg
+    viewBox="0 0 24 24"
+    aria-hidden="true"
+  >
+    <path
+      fill="currentColor"
+      d="M19.54 5.06A16.91 16.91 0 0 0 15.38 3.8l-.51 1.04a15.4 15.4 0 0 0-5.74 0L8.62 3.8a16.91 16.91 0 0 0-4.16 1.26C1.82 9.26 1.11 13.37 1.47 17.42a16.82 16.82 0 0 0 5.14 2.58l1.25-1.72c-.69-.25-1.35-.56-1.97-.92l.48-.37c3.8 1.76 8.01 1.76 11.76 0l.49.37c-.63.36-1.29.67-1.98.92l1.25 1.72a16.82 16.82 0 0 0 5.14-2.58c.42-4.7-.72-8.77-3.49-12.36zM8.24 15.07c-1.12 0-2.04-1.03-2.04-2.3s.9-2.3 2.04-2.3 2.06 1.03 2.04 2.3c0 1.27-.9 2.3-2.04 2.3zm7.52 0c-1.12 0-2.04-1.03-2.04-2.3s.9-2.3 2.04-2.3 2.06 1.03 2.04 2.3c0 1.27-.9 2.3-2.04 2.3z"
+    />
+  </svg>
+</span>
+<span>Discord</span>
+</a>
+
   {authUser && (
     <button
       className="balance balance-button"

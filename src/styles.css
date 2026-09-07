@@ -24534,3 +24534,86 @@ a:focus-visible{
   font-size:11px;
   line-height:1.5;
 }
+
+/* =========================================================
+   CASEX — DISCORD NAV BUTTON
+   ========================================================= */
+
+.discord-nav-button{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:7px;
+  height:38px;
+  padding:0 13px;
+  border:1px solid rgba(139,92,246,.42);
+  border-radius:10px;
+  background:rgba(139,92,246,.09);
+  color:#ddd6fe;
+  text-decoration:none;
+  font-size:12px;
+  font-weight:800;
+  letter-spacing:.1px;
+  white-space:nowrap;
+  transition:
+    transform .18s ease,
+    border-color .18s ease,
+    background .18s ease,
+    box-shadow .18s ease,
+    color .18s ease;
+}
+
+.discord-nav-button:hover{
+  transform:translateY(-1px);
+  border-color:rgba(167,124,255,.75);
+  background:rgba(139,92,246,.16);
+  color:#ffffff;
+  box-shadow:
+    0 8px 24px rgba(139,92,246,.18),
+    0 0 18px rgba(139,92,246,.08);
+}
+
+.discord-nav-button:active{
+  transform:translateY(0);
+}
+
+.discord-nav-icon{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:17px;
+  height:17px;
+  line-height:1;
+  flex-shrink:0;
+}
+
+.discord-nav-icon svg{
+  width:17px;
+  height:17px;
+  display:block;
+  fill:currentColor;
+}
+
+/* Mobile */
+@media(max-width:700px){
+  .discord-nav-button{
+    width:36px;
+    height:36px;
+    padding:0;
+    border-radius:9px;
+  }
+
+  .discord-nav-button > span:last-child{
+    display:none;
+  }
+
+.discord-nav-icon{
+  width:17px;
+  height:17px;
+}
+
+.discord-nav-icon svg{
+  width:17px;
+  height:17px;
+}
+}
