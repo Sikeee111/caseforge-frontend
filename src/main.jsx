@@ -1557,6 +1557,662 @@ function ColorDicingGame({ authUser, openAuth, onBalanceChange }) {
   );
 }
 
+function MinesGame({ authUser, openAuth, onBalanceChange, soundEnabled }) {
+  const gridOptions = [3, 5, 7];
+  const mineOptions = {
+    3: Array.from({ length: 8 }, (_, index) => index + 1),
+    5: Array.from({ length: 24 }, (_, index) => index + 1),
+    7: Array.from({ length: 48 }, (_, index) => index + 1),
+  };
+
+  const HOUSE_EDGE = 0.03;
+  const [gridSize, setGridSize] = useState(5);
+  const [mineCount, setMineCount] = useState(3);
+  const [betAmount, setBetAmount] = useState("10.00");
+  const [game, setGame] = useState(null);
+  const [revealingTile, setRevealingTile] = useState(null);
+  const [loadingGame, setLoadingGame] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [recentGames, setRecentGames] = useState([]);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [mineMenuOpen, setMineMenuOpen] = useState(false);
+
+  const minesAudioRef = useRef(null);
+
+  const getMinesAudio = () => {
+    if (!soundEnabled || typeof window === "undefined") return null;
+
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return null;
+
+    if (!minesAudioRef.current) {
+      minesAudioRef.current = new AudioCtx();
+    }
+
+    if (minesAudioRef.current.state === "suspended") {
+      void minesAudioRef.current.resume().catch(() => {});
+    }
+
+    return minesAudioRef.current;
+  };
+
+  const primeMinesAudio = () => {
+    if (!soundEnabled) return;
+    getMinesAudio();
+  };
+
+  const playMineSafeSound = () => {
+    const ctx = getMinesAudio();
+    if (!ctx) return;
+
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(520, now);
+    osc.frequency.exponentialRampToValueAtTime(760, now + 0.08);
+
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(0.11, now + 0.008);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.13);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.14);
+  };
+
+  const playMineExplosionSound = () => {
+    const ctx = getMinesAudio();
+    if (!ctx) return;
+
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = "sawtooth";
+    osc.frequency.setValueAtTime(145, now);
+    osc.frequency.exponentialRampToValueAtTime(38, now + 0.28);
+
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(0.34, now + 0.008);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.3);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.32);
+  };
+
+  const playMineCashoutSound = () => {
+    const ctx = getMinesAudio();
+    if (!ctx) return;
+
+    const now = ctx.currentTime;
+    [392, 494, 587].forEach((frequency, index) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const delay = index * 0.07;
+
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(frequency, now + delay);
+      gain.gain.setValueAtTime(0.0001, now + delay);
+      gain.gain.exponentialRampToValueAtTime(0.095, now + delay + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + delay + 0.18);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now + delay);
+      osc.stop(now + delay + 0.2);
+    });
+  };
+
+  useEffect(() => {
+    return () => {
+      const context = minesAudioRef.current;
+      if (context && context.state !== "closed") {
+        void context.close();
+      }
+      minesAudioRef.current = null;
+    };
+  }, []);
+
+  const totalTiles = gridSize * gridSize;
+  const safeTiles = Math.max(0, totalTiles - mineCount);
+  const pregameNextSafe = totalTiles > 0 ? safeTiles / totalTiles : 0;
+  const pregameNextMine = Math.max(0, 1 - pregameNextSafe);
+
+  const getPreviewMultiplier = (revealedCount) => {
+    if (revealedCount <= 0) return 1;
+    let survival = 1;
+    for (let i = 0; i < revealedCount; i += 1) {
+      survival *= (safeTiles - i) / (totalTiles - i);
+    }
+    return survival > 0 ? Math.max(1, (1 - HOUSE_EDGE) / survival) : 1;
+  };
+
+  const currentMultiplier = game
+    ? Number(game.currentMultiplier || 1)
+    : 1;
+  const currentBetCents = game
+    ? Number(game.betCents || 0)
+    : Math.round(Number(betAmount || 0) * 100);
+  const potentialWinCents = game
+    ? Number(game.potentialWinCents || 0)
+    : Math.floor(currentBetCents * getPreviewMultiplier(0));
+  const active = game?.status === "active";
+  const finished = game && game.status !== "active";
+  const revealedPositions = new Set(
+    Array.isArray(game?.revealedPositions) ? game.revealedPositions.map(Number) : []
+  );
+  const minePositions = new Set(
+    Array.isArray(game?.minePositions) ? game.minePositions.map(Number) : []
+  );
+
+  const loadRecentGames = async () => {
+    if (!authUser) {
+      setRecentGames([]);
+      return;
+    }
+    try {
+      const response = await apiFetch(`${API}/api/mines/recent`, { cache: "no-store" });
+      const data = await response.json().catch(() => ({}));
+      if (response.ok) setRecentGames(Array.isArray(data.games) ? data.games : []);
+    } catch (error) {
+      console.error("Mines recent-games load failed:", error);
+    }
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadActiveGame = async () => {
+      if (!authUser) {
+        setGame(null);
+        setLoadingGame(false);
+        setErrorMessage("");
+        setRecentGames([]);
+        return;
+      }
+
+      setLoadingGame(true);
+      setErrorMessage("");
+
+      try {
+        const response = await apiFetch(`${API}/api/mines/active`, { cache: "no-store" });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          if (response.status === 401) return;
+          throw new Error(data?.error || "MINES_ACTIVE_GAME_FAILED");
+        }
+
+        if (cancelled) return;
+
+        if (Number.isFinite(Number(data?.balanceCents))) {
+          onBalanceChange?.(Number(data.balanceCents) / 100);
+        }
+
+        if (data?.game) {
+          setGame(data.game);
+          setGridSize(Number(data.game.gridSize));
+          setMineCount(Number(data.game.mineCount));
+          setMineMenuOpen(false);
+          setBetAmount((Number(data.game.betCents) / 100).toFixed(2));
+        } else {
+          setGame(null);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error("Mines active-game load failed:", error);
+          setErrorMessage("Unable to load your Mines game. Please refresh and try again.");
+        }
+      } finally {
+        if (!cancelled) setLoadingGame(false);
+      }
+    };
+
+    void loadActiveGame();
+    void loadRecentGames();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authUser?.id]);
+
+  useEffect(() => {
+    const allowed = mineOptions[gridSize] || [];
+    if (!allowed.includes(mineCount)) {
+      setMineCount(allowed[0] || 1);
+    }
+  }, [gridSize]);
+
+  const startGame = async () => {
+    if (actionLoading || loadingGame) return;
+    if (!authUser) {
+      openAuth("login");
+      return;
+    }
+
+    const numericBet = Number(betAmount);
+    if (!Number.isFinite(numericBet) || numericBet <= 0) {
+      setErrorMessage("Enter a valid bet amount.");
+      return;
+    }
+
+    setActionLoading(true);
+    setErrorMessage("");
+    primeMinesAudio();
+
+    try {
+      const response = await apiFetch(`${API}/api/mines/start`, {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    gridSize,
+    mineCount,
+    betAmount: numericBet.toFixed(2),
+  }),
+});
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data?.error || "MINES_START_FAILED");
+
+      setGame(data.game);
+      setBetAmount((Number(data.game.betCents) / 100).toFixed(2));
+      if (Number.isFinite(Number(data.newBalanceCents))) {
+        onBalanceChange?.(Number(data.newBalanceCents) / 100);
+      }
+    } catch (error) {
+      console.error("Mines start failed:", error);
+      if (error?.message === "INSUFFICIENT_BALANCE") {
+        setErrorMessage("You don't have enough balance for this bet.");
+      } else if (error?.message === "ACTIVE_GAME_EXISTS") {
+        setErrorMessage("You already have an active Mines game.");
+      } else {
+        setErrorMessage("The Mines game could not be started. Please try again.");
+      }
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const revealTile = async (index) => {
+    if (!active || actionLoading || revealedPositions.has(index)) return;
+
+    setActionLoading(true);
+    setRevealingTile(index);
+    setErrorMessage("");
+    primeMinesAudio();
+
+    try {
+      const response = await apiFetch(`${API}/api/mines/reveal`, {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    gameId: Number(game.gameId),
+    tileIndex: index,
+  }),
+});
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data?.error || "MINES_REVEAL_FAILED");
+
+      setGame(data.game);
+      if (
+        data.newBalanceCents != null &&
+        Number.isFinite(Number(data.newBalanceCents))
+      ) {
+        onBalanceChange?.(Number(data.newBalanceCents) / 100);
+      }
+
+      if (data.game?.status === "lost") {
+        playMineExplosionSound();
+      } else if (data.game?.status === "active") {
+        playMineSafeSound();
+      } else if (data.game?.status === "cashed_out") {
+        playMineCashoutSound();
+      }
+
+      if (data.game?.status !== "active") {
+        await loadRecentGames();
+      }
+    } catch (error) {
+      console.error("Mines reveal failed:", error);
+      if (error?.message === "TILE_ALREADY_REVEALED") {
+        setErrorMessage("That tile has already been revealed.");
+      } else if (error?.message === "GAME_ALREADY_FINISHED") {
+        setErrorMessage("This Mines game has already finished.");
+      } else {
+        setErrorMessage("The tile could not be revealed. Please try again.");
+      }
+    } finally {
+      setRevealingTile(null);
+      setActionLoading(false);
+    }
+  };
+
+  const cashOut = async () => {
+    if (!active || actionLoading || revealedPositions.size === 0) return;
+
+    setActionLoading(true);
+    setErrorMessage("");
+    primeMinesAudio();
+
+    try {
+      const response = await apiFetch(`${API}/api/mines/cashout`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ gameId: Number(game.gameId) }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data?.error || "MINES_CASHOUT_FAILED");
+
+      setGame(data.game);
+      if (
+        data.newBalanceCents != null &&
+        Number.isFinite(Number(data.newBalanceCents))
+      ) {
+        onBalanceChange?.(Number(data.newBalanceCents) / 100);
+      }
+      playMineCashoutSound();
+      await loadRecentGames();
+    } catch (error) {
+      console.error("Mines cashout failed:", error);
+      if (error?.message === "NO_TILES_REVEALED") {
+        setErrorMessage("Reveal at least one safe tile before cashing out.");
+      } else {
+        setErrorMessage("Cash out failed. Please try again.");
+      }
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const newGame = () => {
+    setGame(null);
+    setMineMenuOpen(false);
+    setErrorMessage("");
+    setRevealingTile(null);
+  };
+
+  const quickBet = (amount) => {
+    if (!active) setBetAmount(amount.toFixed(2));
+  };
+
+  const nextSafeProbability = game
+    ? Number(game.nextSafeProbability || 0)
+    : pregameNextSafe;
+  const nextMineProbability = game
+    ? Number(game.nextMineProbability || 0)
+    : pregameNextMine;
+
+  return (
+    <section className="mines-page">
+      <div className="mines-shell">
+        <div className="mines-header">
+          <div>
+            <div className="eyebrow">CASEX ORIGINAL</div>
+            <h1>Mines</h1>
+            <p>Uncover tiles, avoid the mines. The further you go, the higher the reward.</p>
+          </div>
+          <div className="mines-live"><span></span>LIVE</div>
+        </div>
+
+        <div className="mines-layout">
+          <aside className="mines-controls-card">
+            <div className="mines-control-block">
+              <div className="eyebrow">GRID SIZE</div>
+              <div className="mines-grid-options">
+                {gridOptions.map((size) => (
+                  <button
+                    key={size}
+                    type="button"
+                    className={gridSize === size ? "active" : ""}
+                    onClick={() => {
+                      if (!active && !actionLoading) {
+                        setGridSize(size);
+                        setMineMenuOpen(false);
+                        setErrorMessage("");
+                      }
+                    }}
+                    disabled={active || actionLoading}
+                  >
+                    {size} × {size}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="mines-control-block">
+              <div className="eyebrow">MINES</div>
+              <div className="mines-select-wrap">
+                <button
+                  type="button"
+                  className={`mines-select ${mineMenuOpen ? "open" : ""}`}
+                  onClick={() => {
+                    if (!active && !actionLoading) setMineMenuOpen((open) => !open);
+                  }}
+                  disabled={active || actionLoading}
+                  aria-haspopup="listbox"
+                  aria-expanded={mineMenuOpen}
+                >
+                  <span>{mineCount}</span>
+                  <span className="mines-select-arrow">⌄</span>
+                </button>
+
+                {mineMenuOpen && !active && !actionLoading && (
+                  <div className="mines-options-menu" role="listbox" aria-label="Mine count">
+                    {(mineOptions[gridSize] || []).map((count) => (
+                      <button
+                        key={count}
+                        type="button"
+                        role="option"
+                        aria-selected={mineCount === count}
+                        className={`mines-option ${mineCount === count ? "active" : ""}`}
+                        onClick={() => {
+                          setMineCount(count);
+                          setMineMenuOpen(false);
+                          setErrorMessage("");
+                        }}
+                      >
+                        {count}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="mines-control-block">
+              <div className="eyebrow">BET AMOUNT</div>
+              <div className="mines-input-wrap">
+                <span>$</span>
+                <input
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  value={active ? (Number(currentBetCents) / 100).toFixed(2) : betAmount}
+                  onChange={(event) => {
+                    if (!active && !actionLoading) setBetAmount(event.target.value);
+                  }}
+                  disabled={active || actionLoading}
+                />
+              </div>
+
+              <div className="mines-quick-bets">
+                {[1, 5, 10, 25, 50].map((amount) => (
+                  <button
+                    key={amount}
+                    type="button"
+                    onClick={() => quickBet(amount)}
+                    disabled={active || actionLoading}
+                  >
+                    ${amount}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="mines-odds-box">
+              <div>
+                <span>Next tile safe</span>
+                <strong>{(nextSafeProbability * 100).toFixed(2)}%</strong>
+              </div>
+              <div>
+                <span>Mine chance</span>
+                <strong>{(nextMineProbability * 100).toFixed(2)}%</strong>
+              </div>
+            </div>
+
+            {!active && !finished ? (
+              <button
+                type="button"
+                className="mines-start-button"
+                onClick={startGame}
+                disabled={loadingGame || actionLoading}
+              >
+                {loadingGame ? "LOADING..." : actionLoading ? "STARTING..." : "START GAME"}
+              </button>
+            ) : active ? (
+              <button
+                type="button"
+                className="mines-start-button mines-cashout-button"
+                onClick={cashOut}
+                disabled={actionLoading || revealedPositions.size === 0}
+              >
+                {actionLoading ? "PROCESSING..." : revealedPositions.size === 0 ? "REVEAL A TILE" : `CASH OUT $${(potentialWinCents / 100).toFixed(2)}`}
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="mines-start-button"
+                onClick={newGame}
+                disabled={actionLoading}
+              >
+                NEW GAME
+              </button>
+            )}
+
+            {errorMessage && (
+              <div className="mines-error">{errorMessage}</div>
+            )}
+          </aside>
+
+          <div className="mines-main-column">
+            <div className={`mines-board mines-board-${gridSize} ${active ? "is-active" : ""} ${finished ? "is-finished" : ""}`}>
+              {Array.from({ length: totalTiles }, (_, index) => {
+                const isRevealed = revealedPositions.has(index);
+                const isMine = minePositions.has(index);
+                const showFinishedBoard = Boolean(finished);
+                const isShown = isRevealed || showFinishedBoard;
+                const disabled =
+                  loadingGame ||
+                  actionLoading ||
+                  (!active && !finished) ||
+                  isRevealed ||
+                  finished;
+
+                return (
+                  <button
+                    key={index}
+                    type="button"
+                    className={`mines-tile ${isShown && !isMine ? "revealed" : ""} ${isMine && showFinishedBoard ? "mine" : ""} ${revealingTile === index ? "is-revealing" : ""}`}
+                    onClick={() => revealTile(index)}
+                    disabled={disabled}
+                    aria-label={isMine && showFinishedBoard ? "Mine" : isShown ? "Safe tile" : "Hidden tile"}
+                  >
+                    {isMine && showFinishedBoard ? "✕" : isShown ? "◆" : "?"}
+                  </button>
+                );
+              })}
+
+              {game?.status === "cashed_out" && (
+                <div className="mines-result-overlay" aria-live="polite">
+                  <strong>{currentMultiplier.toFixed(2)}×</strong>
+                  <span>
+                    ${(Number(game.payoutCents || 0) / 100).toFixed(2)}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <div className="mines-stats-bar">
+              <div>
+                <span>Tiles Left</span>
+                <strong>{game ? Number(game.tilesLeft || 0) : safeTiles}</strong>
+              </div>
+              <div>
+                <span>Current Multiplier</span>
+                <strong>{currentMultiplier.toFixed(2)}x</strong>
+              </div>
+              <div>
+                <span>Potential Win</span>
+                <strong>${(potentialWinCents / 100).toFixed(2)}</strong>
+              </div>
+            </div>
+            <div className="mines-odds-note">
+              Next tile: <strong>{(nextSafeProbability * 100).toFixed(2)}% safe</strong> · <strong>{(nextMineProbability * 100).toFixed(2)}% mine</strong>
+            </div>
+          </div>
+        </div>
+
+        <div className="mines-recent-card">
+          <div className="mines-card-heading">
+            <div>
+              <div className="eyebrow">RECENT GAMES</div>
+              <h2>Mines Activity</h2>
+            </div>
+            <span className="mines-card-muted">Your latest rounds will appear here.</span>
+          </div>
+
+          {recentGames.length ? (
+            <div className="mines-recent-table-wrap">
+              <table className="mines-recent-table">
+                <thead>
+                  <tr>
+                    <th>Grid</th>
+                    <th>Mines</th>
+                    <th>Tiles</th>
+                    <th>Multiplier</th>
+                    <th>Win</th>
+                    <th>Result</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recentGames.map((entry) => (
+                    <tr key={entry.gameId}>
+                      <td>{entry.gridSize} × {entry.gridSize}</td>
+                      <td>{entry.mineCount}</td>
+                      <td>{entry.revealedCount}</td>
+                      <td className="mines-history-multiplier">{Number(entry.multiplier || 0).toFixed(2)}x</td>
+                      <td>${(Number(entry.payoutCents || 0) / 100).toFixed(2)}</td>
+                      <td className={entry.status === "lost" ? "mines-history-loss" : "mines-history-win"}>
+                        {entry.status === "lost" ? "Hit Mine" : "Cashed Out"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="mines-recent-empty">
+              <span>◆</span>
+              <strong>No Mines games yet</strong>
+              <small>Start a game to build your recent activity history.</small>
+            </div>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+
 function App() {
   useScrollReveal();
   const [balance, setBalance] = useState(100);
@@ -1857,6 +2513,7 @@ function App() {
   const [selected, setSelected] = useState(null);
   const [casesPageOpen, setCasesPageOpen] = useState(false);
   const [colorDicingOpen, setColorDicingOpen] = useState(false);
+  const [minesOpen, setMinesOpen] = useState(false);
   const [casesSearch, setCasesSearch] = useState("");
   const [casesTagFilter, setCasesTagFilter] = useState("All");
   const [casesSort, setCasesSort] = useState("featured");
@@ -4291,6 +4948,7 @@ useEffect(() => {
 
   const openColorDicing = () => {
     if (opening) return;
+    setMinesOpen(false);
     if (selected) closeCasePage();
     if (casesPageOpen) closeCasesPage();
     setProfileOpen(false);
@@ -4302,6 +4960,22 @@ useEffect(() => {
 
   const closeColorDicing = () => {
     setColorDicingOpen(false);
+  };
+
+  const openMines = () => {
+    if (opening) return;
+    if (selected) closeCasePage();
+    if (casesPageOpen) closeCasesPage();
+    setProfileOpen(false);
+    setColorDicingOpen(false);
+    setMinesOpen(true);
+    requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+  };
+
+  const closeMines = () => {
+    setMinesOpen(false);
   };
 
   const openCasesPage = () => {
@@ -4933,6 +5607,125 @@ useEffect(() => {
             color:#f4efff;
             font-size:17px;
           }
+
+          .mines-page-wrap{
+            position:relative;
+            min-height:calc(100vh - 76px);
+            padding:10px 0 34px;
+            background:
+              radial-gradient(circle at 50% 5%,#171229 0%,#090a10 40%,#07080c 100%);
+          }
+          .mines-back{
+            display:block;
+            width:min(1120px,90vw);
+            margin:0 auto 10px;
+            border:1px solid #2d2f3a;
+            background:#11121a;
+            color:#d9dae2;
+            border-radius:11px;
+            padding:10px 15px;
+            font-weight:700;
+          }
+          .mines-shell{width:min(1120px,90vw);margin:0 auto}
+          .mines-header{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;padding:18px 4px 17px;border-bottom:1px solid #242530}
+          .mines-header h1{margin:0;font-size:34px;line-height:1;letter-spacing:-2px}
+          .mines-header p{margin:8px 0 0;color:#858895;font-size:11px}
+          .mines-live{display:inline-flex;align-items:center;gap:8px;padding:9px 12px;border:1px solid rgba(74,222,128,.25);border-radius:999px;background:rgba(74,222,128,.06);color:#63e89d;font-size:10px;font-weight:900;letter-spacing:1px}
+          .mines-live span{width:7px;height:7px;border-radius:50%;background:#44df8c;box-shadow:0 0 12px #44df8c}
+          .mines-layout{display:grid;grid-template-columns:280px minmax(0,1fr);gap:18px;padding-top:14px}
+          .mines-controls-card,.mines-board,.mines-stats-bar,.mines-recent-card{border:1px solid #242630;border-radius:18px;background:linear-gradient(160deg,#11121a,#090a0f);box-shadow:0 22px 60px #0005}
+          .mines-controls-card{padding:18px;align-self:start}
+          .mines-control-block + .mines-control-block{margin-top:13px}
+          .mines-grid-options{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:10px}
+          .mines-grid-options button{height:40px;border:1px solid rgba(255,255,255,.08);border-radius:10px;background:rgba(255,255,255,.025);color:#aaa6b4;font-size:11px;font-weight:900;cursor:pointer}
+          .mines-grid-options button.active{border-color:#a56cff;background:rgba(157,108,255,.12);color:#fff;box-shadow:0 0 0 1px rgba(157,108,255,.2),0 0 25px rgba(126,78,222,.12)}
+          .mines-grid-options button:disabled{cursor:not-allowed;opacity:.62}
+          .mines-select-wrap{position:relative;margin-top:10px}
+          .mines-select{width:100%;height:42px;padding:0 12px;border:1px solid rgba(255,255,255,.1);border-radius:10px;background:#141620;color:#fff;outline:none;font:800 13px/1 inherit;display:flex;align-items:center;justify-content:space-between;text-align:left;cursor:pointer}
+          .mines-select:hover:not(:disabled),.mines-select.open{border-color:rgba(176,132,255,.42);box-shadow:0 0 0 1px rgba(157,108,255,.1)}
+          .mines-select:disabled{cursor:not-allowed;opacity:.62}
+          .mines-select-arrow{color:#8e879c;font-size:16px;line-height:1;transform:translateY(-1px)}
+          .mines-select.open .mines-select-arrow{transform:rotate(180deg) translateY(1px)}
+          .mines-options-menu{position:absolute;z-index:40;top:calc(100% + 6px);left:0;right:0;max-height:240px;overflow-y:auto;padding:5px;border:1px solid rgba(176,132,255,.22);border-radius:10px;background:linear-gradient(180deg,#171925,#10111a);box-shadow:0 18px 40px rgba(0,0,0,.5)}
+          .mines-option{display:flex;width:100%;min-height:34px;align-items:center;justify-content:flex-start;padding:0 10px;border:1px solid transparent;border-radius:7px;background:transparent;color:#a6a1af;font:800 12px/1 inherit;cursor:pointer;text-align:left}
+          .mines-option:hover,.mines-option.active{background:rgba(157,108,255,.11);border-color:rgba(176,132,255,.16);color:#fff}
+          .mines-input-wrap{display:flex;align-items:center;gap:6px;height:42px;margin-top:10px;padding:0 12px;border:1px solid rgba(255,255,255,.09);border-radius:10px;background:rgba(0,0,0,.18)}
+          .mines-input-wrap span{color:#777286;font-size:14px;font-weight:900}
+          .mines-input-wrap input{width:100%;border:0;outline:0;background:transparent;color:#fff;font:800 14px/1 inherit}
+          .mines-quick-bets{display:grid;grid-template-columns:repeat(5,1fr);gap:5px;margin-top:8px}
+          .mines-quick-bets button{min-height:31px;border:1px solid rgba(255,255,255,.07);border-radius:7px;background:rgba(255,255,255,.025);color:#8f899b;font-size:9px;font-weight:800}
+          .mines-quick-bets button:hover:not(:disabled){color:#fff;border-color:rgba(176,132,255,.3)}
+          .mines-odds-box{margin-top:12px;padding:10px 11px;border:1px solid rgba(157,108,255,.14);border-radius:10px;background:rgba(157,108,255,.045);display:grid;grid-template-columns:1fr 1fr;gap:8px}
+          .mines-odds-box div{display:flex;flex-direction:column;gap:3px}
+          .mines-odds-box span{color:#6f6a79;font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:.7px}
+          .mines-odds-box strong{color:#c9b5ff;font-size:11px;font-weight:950}
+          .mines-odds-note{width:100%;max-width:520px;text-align:center;color:#706b7c;font-size:9px;line-height:1.4}
+          .mines-odds-note strong{color:#a98cff;font-weight:900}
+          .mines-start-button{width:100%;height:46px;margin-top:12px;border:0;border-radius:12px;background:linear-gradient(135deg,#9d6cff,#7042d2);color:#fff;font-size:12px;font-weight:950;letter-spacing:1px;box-shadow:0 12px 30px rgba(126,78,222,.25)}
+          .mines-main-column{min-width:0;display:flex;flex-direction:column;gap:14px}
+          .mines-board{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;padding:14px;aspect-ratio:1/1;max-width:520px;margin:0 auto;width:100%;background:radial-gradient(circle at 50% 0,#151229,#0a0b11 55%,#08090d)}
+          .mines-board{position:relative}
+          .mines-result-overlay{position:absolute;left:50%;top:50%;z-index:5;transform:translate(-50%,-50%);min-width:132px;padding:14px 18px 13px;border:2px solid #1dff35;border-radius:10px;background:rgba(9,24,19,.94);box-shadow:0 0 0 1px rgba(29,255,53,.14),0 0 28px rgba(29,255,53,.2),0 18px 40px rgba(0,0,0,.45);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;pointer-events:none;backdrop-filter:blur(4px)}
+          .mines-result-overlay::after{content:"";position:absolute;left:50%;top:58%;width:34px;height:3px;transform:translate(-50%,-50%);background:#1e3b40;border-radius:99px}
+          .mines-result-overlay strong{color:#18ff35;font-size:25px;line-height:1;font-weight:950;letter-spacing:-.7px}
+          .mines-result-overlay span{margin-top:8px;color:#1dff35;font-size:12px;font-weight:950;letter-spacing:.2px}
+
+          .mines-board-3{grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+          .mines-board-7{grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
+          .mines-tile{min-width:0;border:1px solid rgba(154,133,204,.34);border-radius:10px;background:linear-gradient(145deg,#1b1e31,#10131f);color:#c7c1d6;font-size:28px;font-weight:900;box-shadow:inset 0 0 25px rgba(157,108,255,.04),0 7px 16px #0005;transition:.16s ease;cursor:pointer}
+          .mines-tile:hover:not(:disabled){transform:translateY(-2px);border-color:rgba(177,133,255,.72);box-shadow:inset 0 0 30px rgba(157,108,255,.1),0 10px 24px #0007}
+          .mines-tile.revealed{color:#9f7cff;background:linear-gradient(145deg,#24194a,#141021);border-color:rgba(168,124,255,.6);box-shadow:inset 0 0 30px rgba(157,108,255,.18),0 0 22px rgba(157,108,255,.08)}
+          .mines-tile.mine{color:#ff7b7b;background:linear-gradient(145deg,#401b2b,#1b1018);border-color:rgba(255,100,120,.6);box-shadow:inset 0 0 30px rgba(255,87,112,.18),0 0 22px rgba(255,87,112,.08)}
+          .mines-tile.is-revealing{transform:scale(.96);opacity:.7}
+          .mines-board.is-active .mines-tile:not(:disabled):hover{transform:translateY(-2px) scale(1.015)}
+          .mines-cashout-button{background:linear-gradient(135deg,#22c55e,#159447);box-shadow:0 12px 30px rgba(34,197,94,.16)}
+          .mines-error{margin-top:10px;padding:9px 10px;border:1px solid rgba(248,113,113,.24);border-radius:9px;background:rgba(248,113,113,.05);color:#ff8b8b;font-size:9px;line-height:1.4}
+          .mines-recent-table-wrap{overflow:auto}
+          .mines-recent-table{width:100%;border-collapse:collapse;min-width:650px}
+          .mines-recent-table th,.mines-recent-table td{padding:11px 10px;border-bottom:1px solid #1e2029;text-align:left;font-size:10px;white-space:nowrap}
+          .mines-recent-table th{color:#777283;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.7px}
+          .mines-recent-table td{color:#d2ceda}
+          .mines-history-multiplier{color:#b895ff !important;font-weight:900}
+          .mines-history-win{color:#4ade80 !important;font-weight:900}
+          .mines-history-loss{color:#ff7b7b !important;font-weight:900}
+          .mines-tile:disabled{cursor:default}
+          .mines-board-7 .mines-tile{font-size:20px;border-radius:9px}
+          .mines-board{min-height:0}
+          .mines-main-column{align-items:center}
+          .mines-stats-bar{width:100%;max-width:520px}
+          .mines-stats-bar{display:grid;grid-template-columns:repeat(3,1fr);padding:16px 8px}
+          .mines-stats-bar > div{text-align:center;padding:2px 16px;border-right:1px solid #252732}
+          .mines-stats-bar > div:last-child{border-right:0}
+          .mines-stats-bar span{display:block;color:#7f7a8a;font-size:10px;font-weight:700}
+          .mines-stats-bar strong{display:block;margin-top:5px;color:#fff;font-size:21px;font-weight:950}
+          .mines-stats-bar > div:nth-child(2) strong{color:#a57cff}
+          .mines-recent-card{margin-top:16px;padding:18px}
+          .mines-card-heading{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;padding-bottom:16px;border-bottom:1px solid #20222b}
+          .mines-card-heading h2{margin:0;font-size:24px;letter-spacing:-.8px}
+          .mines-card-muted{color:#6d6878;font-size:10px}
+          .mines-recent-empty{min-height:160px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:7px;text-align:center}
+          .mines-recent-empty span{color:#8d6eff;font-size:26px}
+          .mines-recent-empty strong{font-size:13px}
+          .mines-recent-empty small{color:#6d6878;font-size:10px}
+          @media(max-width:900px){
+            .mines-layout{grid-template-columns:1fr}
+            .mines-controls-card{order:2}
+            .mines-main-column{order:1}
+          }
+          @media(max-width:600px){
+            .mines-page-wrap{padding:12px 0 50px}
+            .mines-shell{width:calc(100% - 20px)}
+            .mines-header{padding:18px 2px}
+            .mines-header h1{font-size:34px}
+            .mines-live{display:none}
+            .mines-board{gap:6px;padding:10px}
+            .mines-board-3{gap:8px}
+            .mines-board-7{gap:4px}
+            .mines-tile{font-size:21px;border-radius:8px}
+            .mines-board-7 .mines-tile{font-size:15px;border-radius:6px}
+            .mines-stats-bar strong{font-size:17px}
+            .mines-card-heading{align-items:flex-start;flex-direction:column}
+          }
           .color-dicing-result{
             display:flex;
             flex-direction:column;
@@ -5216,6 +6009,7 @@ useEffect(() => {
             onClick={() => {
               if (opening) return;
               if (colorDicingOpen) closeColorDicing();
+              if (minesOpen) closeMines();
 
               if (casesPageOpen) {
                 closeCasesPage();
@@ -5248,10 +6042,19 @@ useEffect(() => {
 
           <button
             type="button"
+            className="nav-link-button mines-nav-link"
+            onClick={openMines}
+          >
+            Mines
+          </button>
+
+          <button
+            type="button"
             className="nav-link-button"
             onClick={() => {
               if (opening) return;
               if (colorDicingOpen) closeColorDicing();
+              if (minesOpen) closeMines();
 
               if (casesPageOpen) {
                 closeCasesPage();
@@ -5280,6 +6083,7 @@ useEffect(() => {
             onClick={() => {
               if (opening) return;
               if (colorDicingOpen) closeColorDicing();
+              if (minesOpen) closeMines();
               if (casesPageOpen) closeCasesPage();
               if (selected) closeCasePage();
               requestAnimationFrame(() => {
@@ -5298,6 +6102,7 @@ useEffect(() => {
             onClick={() => {
               if (opening) return;
               if (colorDicingOpen) closeColorDicing();
+              if (minesOpen) closeMines();
               if (casesPageOpen) closeCasesPage();
               if (selected) closeCasePage();
               requestAnimationFrame(() => {
@@ -5316,6 +6121,7 @@ useEffect(() => {
             onClick={() => {
               if (opening) return;
               if (colorDicingOpen) closeColorDicing();
+              if (minesOpen) closeMines();
               if (casesPageOpen) closeCasesPage();
               if (selected) closeCasePage();
               requestAnimationFrame(() => {
@@ -5747,7 +6553,25 @@ useEffect(() => {
         </div>
       )}
 
-      <main id="home" style={{ display: colorDicingOpen ? "none" : undefined }}>
+      {minesOpen && (
+        <div className="mines-page-wrap">
+          <button
+            type="button"
+            className="mines-back"
+            onClick={closeMines}
+          >
+            ← Back to CASEX
+          </button>
+          <MinesGame
+            authUser={authUser}
+            openAuth={openAuth}
+            onBalanceChange={setBalance}
+            soundEnabled={soundEnabled}
+          />
+        </div>
+      )}
+
+      <main id="home" style={{ display: colorDicingOpen || minesOpen ? "none" : undefined }}>
         <section className="hero">
           <div className="hero-glow"></div>
 
