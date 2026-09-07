@@ -786,6 +786,661 @@ function JackpotWheel({ players = [], totalCents = 0 }) {
   );
 }
 
+
+function ColorDicingGame({ authUser, openAuth, onBalanceChange }) {
+  const colors = [
+    { id: "red", name: "Red", hex: "#ef4444" },
+    { id: "orange", name: "Orange", hex: "#f97316" },
+    { id: "yellow", name: "Yellow", hex: "#eab308" },
+    { id: "green", name: "Green", hex: "#22c55e" },
+    { id: "blue", name: "Blue", hex: "#3b82f6" },
+    { id: "purple", name: "Purple", hex: "#a855f7" },
+  ];
+
+  const [selectedColor, setSelectedColor] = useState("red");
+  const [betAmount, setBetAmount] = useState("10.00");
+  const [dice, setDice] = useState([
+    "red",
+    "blue",
+    "green",
+    "purple",
+  ]);
+  const [rolling, setRolling] = useState(false);
+  const [result, setResult] = useState(null);
+  const [gameId, setGameId] = useState(null);
+  const [gameStatus, setGameStatus] = useState(null);
+  const [loadingGame, setLoadingGame] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
+  const rollTimerRef = useRef(null);
+  const audioContextRef = useRef(null);
+  const soundIntervalRef = useRef(null);
+
+  const getAudioContext = () => {
+    if (typeof window === "undefined") return null;
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return null;
+
+    if (!audioContextRef.current) {
+      audioContextRef.current = new AudioCtx();
+    }
+
+    if (audioContextRef.current.state === "suspended") {
+      audioContextRef.current.resume().catch(() => {});
+    }
+
+    return audioContextRef.current;
+  };
+
+  // Pleasant dice-roll sound: short rounded impacts with a soft table body.
+  // Avoids sustained noise, which can sound like cans or a shaker.
+  const playDiceImpact = (intensity = 1, pitch = 1) => {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+
+    // Low, rounded body of the die hitting a table.
+    const body = ctx.createOscillator();
+    const bodyGain = ctx.createGain();
+    body.type = "sine";
+    body.frequency.setValueAtTime(185 * pitch, now);
+    body.frequency.exponentialRampToValueAtTime(88 * pitch, now + 0.075);
+    bodyGain.gain.setValueAtTime(0.0001, now);
+    bodyGain.gain.exponentialRampToValueAtTime(0.115 * intensity, now + 0.003);
+    bodyGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.09);
+    body.connect(bodyGain);
+    bodyGain.connect(ctx.destination);
+    body.start(now);
+    body.stop(now + 0.095);
+
+    // Tiny, heavily filtered click = the hard edge of a die collision.
+    const length = Math.floor(ctx.sampleRate * 0.026);
+    const buffer = ctx.createBuffer(1, length, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < length; i += 1) {
+      const envelope = Math.pow(1 - i / length, 8);
+      data[i] = (Math.random() * 2 - 1) * envelope;
+    }
+
+    const source = ctx.createBufferSource();
+    const filter = ctx.createBiquadFilter();
+    const clickGain = ctx.createGain();
+    source.buffer = buffer;
+    filter.type = "bandpass";
+    filter.frequency.setValueAtTime(2400 * pitch, now);
+    filter.Q.value = 1.8;
+    clickGain.gain.setValueAtTime(0.0001, now);
+    clickGain.gain.exponentialRampToValueAtTime(0.055 * intensity, now + 0.001);
+    clickGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.026);
+    source.connect(filter);
+    filter.connect(clickGain);
+    clickGain.connect(ctx.destination);
+    source.start(now);
+  };
+
+  const playDiceTick = (pitch = 1) => {
+    // A real-looking tumble has irregular collisions rather than one continuous rattle.
+    playDiceImpact(0.46, pitch * (0.94 + Math.random() * 0.08));
+    window.setTimeout(() => {
+      playDiceImpact(0.31, pitch * (0.9 + Math.random() * 0.18));
+    }, 27 + Math.random() * 20);
+    if (Math.random() > 0.5) {
+      window.setTimeout(() => {
+        playDiceImpact(0.22, pitch * (0.92 + Math.random() * 0.14));
+      }, 58 + Math.random() * 24);
+    }
+  };
+
+  const playDiceLand = (matches = 0) => {
+    // Four dice settle naturally, with each impact slightly different.
+    [0, 34, 69, 103].forEach((delay, index) => {
+      window.setTimeout(() => {
+        playDiceImpact(0.52 + index * 0.07, 0.9 + Math.random() * 0.16);
+      }, delay);
+    });
+
+    // Soft musical resolution for a win, kept deliberately subtle.
+    if (matches === 1 || matches >= 4) {
+      window.setTimeout(() => {
+        const ctx = getAudioContext();
+        if (!ctx) return;
+        const now = ctx.currentTime;
+        const notes = matches >= 4 ? [392, 494, 587] : [330, 415];
+        notes.forEach((frequency, index) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          const delay = index * 0.055;
+          osc.type = "sine";
+          osc.frequency.setValueAtTime(frequency, now + delay);
+          gain.gain.setValueAtTime(0.0001, now + delay);
+          gain.gain.exponentialRampToValueAtTime(matches >= 4 ? 0.022 : 0.016, now + delay + 0.008);
+          gain.gain.exponentialRampToValueAtTime(0.0001, now + delay + 0.15);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now + delay);
+          osc.stop(now + delay + 0.16);
+        });
+      }, 145);
+    }
+  };
+
+  const colorById = (id) =>
+    colors.find((color) => color.id === id) || colors[0];
+
+  const formatMoney = (cents) =>
+    `$${(Number(cents || 0) / 100).toFixed(2)}`;
+
+  const resultFromGame = (game) => {
+    const matches = Number(game?.matches ?? 0);
+    const profitCents = Number(game?.profitCents || 0);
+    const payoutCents = Number(game?.payoutCents || 0);
+
+    if (matches === 0) {
+      return {
+        type: "loss",
+        matches,
+        title: "You lose",
+        message: "No dice matched your selected color. Your locked bet was lost.",
+      };
+    }
+
+    if (matches === 1) {
+      return {
+        type: "win",
+        matches,
+        multiplier: 1,
+        title: "You win ×1",
+        message: `+$${(profitCents / 100).toFixed(2)} profit · ${formatMoney(payoutCents)} returned.`,
+      };
+    }
+
+    if (matches === 2 || matches === 3) {
+      return {
+        type: "reroll",
+        matches,
+        title: "Reroll",
+        message: `${matches} dice matched. Your bet remains locked — reroll for free.`,
+      };
+    }
+
+    return {
+      type: "win",
+      matches,
+      multiplier: 3,
+      title: "You win ×3",
+      message: `+$${(profitCents / 100).toFixed(2)} profit · ${formatMoney(payoutCents)} returned.`,
+    };
+  };
+
+  const animateToServerDice = async (serverPromise) => {
+    let settled = false;
+    let serverResponse = null;
+    let serverError = null;
+
+    serverPromise
+      .then((response) => {
+        serverResponse = response;
+        settled = true;
+      })
+      .catch((error) => {
+        serverError = error;
+        settled = true;
+      });
+
+    let ticks = 0;
+
+    if (soundIntervalRef.current) {
+      window.clearInterval(soundIntervalRef.current);
+    }
+    soundIntervalRef.current = window.setInterval(() => {
+      playDiceTick(0.92 + Math.random() * 0.28);
+    }, 105);
+
+    while (ticks < 15 || !settled) {
+      setDice(
+        Array.from(
+          { length: 4 },
+          () => colors[Math.floor(Math.random() * colors.length)].id
+        )
+      );
+
+      ticks += 1;
+
+      await new Promise((resolve) => {
+        rollTimerRef.current = window.setTimeout(
+          resolve,
+          58 + Math.min(ticks, 15) * 10
+        );
+      });
+    }
+
+    if (soundIntervalRef.current) {
+      window.clearInterval(soundIntervalRef.current);
+      soundIntervalRef.current = null;
+    }
+
+    if (serverError) {
+      throw serverError;
+    }
+
+    return serverResponse;
+  };
+
+  const applyGameResponse = (data) => {
+    const game = data?.game;
+
+    if (!game) {
+      throw new Error("COLOR_DICING_GAME_MISSING");
+    }
+
+    if (Array.isArray(game.dice) && game.dice.length === 4) {
+      setDice(game.dice);
+    }
+
+    setSelectedColor(game.selectedColor);
+    setBetAmount((Number(game.betCents) / 100).toFixed(2));
+
+    if (Number.isFinite(Number(data?.newBalanceCents))) {
+      onBalanceChange?.(Number(data.newBalanceCents) / 100);
+    }
+
+    const nextResult = resultFromGame(game);
+    setResult(nextResult);
+    playDiceLand(Number(game.matches || 0));
+
+    if (game.status === "active") {
+      setGameId(Number(game.gameId));
+      setGameStatus("active");
+    } else {
+      setGameId(null);
+      setGameStatus(game.status);
+    }
+
+    return game;
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadActiveGame = async () => {
+      if (!authUser) {
+        setLoadingGame(false);
+        setGameId(null);
+        setGameStatus(null);
+        return;
+      }
+
+      setLoadingGame(true);
+      setErrorMessage("");
+
+      try {
+        const response = await apiFetch(`${API}/api/color-dicing/active`);
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+          if (response.status === 401) return;
+          throw new Error(data?.error || "COLOR_DICING_ACTIVE_GAME_FAILED");
+        }
+
+        if (cancelled) return;
+
+        if (Number.isFinite(Number(data?.balanceCents))) {
+          onBalanceChange?.(Number(data.balanceCents) / 100);
+        }
+
+        if (data?.game) {
+          const game = data.game;
+          setSelectedColor(game.selectedColor);
+          setBetAmount((Number(game.betCents) / 100).toFixed(2));
+          setDice(Array.isArray(game.dice) ? game.dice : []);
+          setGameId(Number(game.gameId));
+          setGameStatus("active");
+          setResult(resultFromGame(game));
+        } else {
+          setGameId(null);
+          setGameStatus(null);
+          setResult(null);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error("Color Dicing active-game load failed:", error);
+          setErrorMessage("Unable to load your active game. Please try again.");
+        }
+      } finally {
+        if (!cancelled) setLoadingGame(false);
+      }
+    };
+
+    loadActiveGame();
+
+    return () => {
+      cancelled = true;
+      if (rollTimerRef.current) {
+        window.clearTimeout(rollTimerRef.current);
+      }
+      if (soundIntervalRef.current) {
+        window.clearInterval(soundIntervalRef.current);
+        soundIntervalRef.current = null;
+      }
+    };
+  }, [authUser?.id]);
+
+  const submitRoll = async (isReroll = false) => {
+    if (rolling || loadingGame) return;
+
+    if (!authUser) {
+      openAuth("login");
+      return;
+    }
+
+    if (isReroll && !gameId) {
+      setErrorMessage("There is no active game to reroll.");
+      return;
+    }
+
+    const numericBet = Number(betAmount);
+
+    if (!isReroll && (!Number.isFinite(numericBet) || numericBet <= 0)) {
+      setResult({
+        type: "error",
+        title: "Invalid bet",
+        message: "Enter a valid bet amount.",
+      });
+      return;
+    }
+
+    setRolling(true);
+    setErrorMessage("");
+
+    try {
+      const serverPromise = apiFetch(
+        `${API}/api/color-dicing/${isReroll ? "reroll" : "roll"}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(
+            isReroll
+              ? { gameId, selectedColor }
+              : {
+                  selectedColor,
+                  betAmount: numericBet.toFixed(2),
+                }
+          ),
+        }
+      ).then(async (response) => {
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+          const error = new Error(
+            data?.error || "COLOR_DICING_ROLL_FAILED"
+          );
+          error.status = response.status;
+          throw error;
+        }
+
+        return data;
+      });
+
+      const data = await animateToServerDice(serverPromise);
+      applyGameResponse(data);
+    } catch (error) {
+      console.error("Color Dicing roll failed:", error);
+
+      if (error?.status === 401) {
+        openAuth("login");
+      } else if (error?.message === "INSUFFICIENT_BALANCE") {
+        setErrorMessage("You don't have enough balance for this bet.");
+      } else if (error?.message === "ACTIVE_GAME_EXISTS") {
+        setErrorMessage("You already have an active Color Dicing game.");
+      } else if (error?.message === "GAME_NOT_FOUND") {
+        setErrorMessage("That game is no longer active. Refreshing your game state...");
+      } else {
+        setErrorMessage("The roll could not be completed. Please try again.");
+      }
+    } finally {
+      setRolling(false);
+    }
+  };
+
+  const rollDice = () => submitRoll(false);
+  const rerollDice = () => submitRoll(true);
+
+  const selected = colorById(selectedColor);
+  const numericBet = Number(betAmount);
+  const potentialOneMatch =
+    Number.isFinite(numericBet) && numericBet > 0 ? numericBet * 2 : 0;
+  const potentialFourMatch =
+    Number.isFinite(numericBet) && numericBet > 0 ? numericBet * 4 : 0;
+  const betLocked = gameStatus === "active";
+  const actionIsReroll = betLocked && result?.type === "reroll";
+
+  return (
+    <section className="color-dicing-page">
+      <div className="color-dicing-shell">
+        <div className="color-dicing-header">
+          <div>
+            <div className="eyebrow">CASEX ORIGINAL</div>
+            <h1>Color Dicing</h1>
+            <p>
+              Pick a color and roll four dice. Match your color to win.
+            </p>
+          </div>
+
+          <div className="color-dicing-live">
+            <span></span>
+            LIVE
+          </div>
+        </div>
+
+        <div className="color-dicing-layout">
+          <div className="color-dicing-board">
+            <div className="color-dicing-board-top">
+              <div>
+                <span className="color-dicing-label">YOUR COLOR</span>
+                <strong style={{ color: selected.hex }}>
+                  {selected.name}
+                </strong>
+              </div>
+
+              <div className="color-dicing-bet-display">
+                <span>{betLocked ? "BET LOCKED" : "BET"}</span>
+                <strong>
+                  ${Number.isFinite(numericBet) ? numericBet.toFixed(2) : "0.00"}
+                </strong>
+              </div>
+            </div>
+
+            <div className={`color-dice-row ${rolling ? "rolling" : ""} ${result?.type === "win" && !rolling ? "landed-win" : ""} ${result?.type === "loss" && !rolling ? "landed-loss" : ""}`}>
+              {dice.map((colorId, index) => {
+                const color = colorById(colorId);
+
+                return (
+                  <div
+                    key={index}
+                    className="color-die"
+                    style={{
+                      "--die-color": color.hex,
+                    }}
+                  >
+                    <div className="color-die-face">
+                      <span className="color-die-dot"></span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="color-dicing-match">
+              {result?.matches != null ? (
+                <>
+                  <span>MATCHES</span>
+                  <strong>{result.matches}/4</strong>
+                </>
+              ) : (
+                <>
+                  <span>SELECT A COLOR</span>
+                  <strong>ROLL 4 DICE</strong>
+                </>
+              )}
+            </div>
+
+            {result && (
+              <div className={`color-dicing-result ${result.type}`}>
+                <strong>{result.title}</strong>
+                <span>{result.message}</span>
+              </div>
+            )}
+
+            {errorMessage && (
+              <div className="color-dicing-result error">
+                <strong>Something went wrong</strong>
+                <span>{errorMessage}</span>
+              </div>
+            )}
+
+            <button
+              type="button"
+              className="color-dicing-roll"
+              onClick={actionIsReroll ? rerollDice : rollDice}
+              disabled={rolling || loadingGame || (betLocked && !actionIsReroll)}
+            >
+              {rolling
+                ? "ROLLING..."
+                : loadingGame
+                ? "LOADING..."
+                : actionIsReroll
+                ? "REROLL DICE"
+                : "ROLL DICE"}
+            </button>
+
+            {betLocked && (
+              <div className="color-dicing-demo-note">
+                🔒 Your {formatMoney(Number(betAmount) * 100)} bet is locked.
+                Rerolls are free and do not change the wager.
+              </div>
+            )}
+          </div>
+
+          <aside className="color-dicing-sidebar">
+            <div className="color-dicing-card">
+              <div className="eyebrow">CHOOSE YOUR COLOR</div>
+
+              <div className="color-dicing-colors">
+                {colors.map((color) => (
+                  <button
+                    key={color.id}
+                    type="button"
+                    className={`color-dicing-color ${
+                      selectedColor === color.id ? "active" : ""
+                    }`}
+                    onClick={() => {
+                      if (!rolling && (!betLocked || actionIsReroll)) {
+                        setSelectedColor(color.id);
+
+                        // Keep the reroll state active while changing color.
+                        // Only clear the result when starting a fresh game.
+                        if (!betLocked) {
+                          setResult(null);
+                        }
+
+                        setErrorMessage("");
+                      }
+                    }}
+                    disabled={
+                      rolling ||
+                      loadingGame ||
+                      (betLocked && !actionIsReroll)
+                    }
+                  >
+                    <span
+                      className="color-dicing-color-dot"
+                      style={{ background: color.hex }}
+                    ></span>
+                    <span>{color.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="color-dicing-card">
+              <div className="eyebrow">BET AMOUNT</div>
+
+              <div className="color-dicing-input-wrap">
+                <span>$</span>
+                <input
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  inputMode="decimal"
+                  value={betAmount}
+                  onChange={(event) => {
+                    if (betLocked) return;
+                    setBetAmount(event.target.value);
+                    setResult(null);
+                    setErrorMessage("");
+                  }}
+                  disabled={rolling || loadingGame || betLocked}
+                />
+              </div>
+
+              <div className="color-dicing-quick-bets">
+                {[1, 5, 10, 25, 50].map((amount) => (
+                  <button
+                    key={amount}
+                    type="button"
+                    onClick={() => {
+                      if (!betLocked) setBetAmount(amount.toFixed(2));
+                    }}
+                    disabled={rolling || loadingGame || betLocked}
+                  >
+                    ${amount}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="color-dicing-card">
+              <div className="eyebrow">PAYOUT RULES</div>
+
+              <div className="color-dicing-rules">
+                <div>
+                  <span>0 matching</span>
+                  <strong className="loss">LOSE</strong>
+                </div>
+                <div>
+                  <span>1 matching</span>
+                  <strong>×1 PROFIT</strong>
+                </div>
+                <div>
+                  <span>2 matching</span>
+                  <strong className="reroll">REROLL</strong>
+                </div>
+                <div>
+                  <span>3 matching</span>
+                  <strong className="reroll">REROLL</strong>
+                </div>
+                <div>
+                  <span>4 matching</span>
+                  <strong className="win">×3 PROFIT</strong>
+                </div>
+              </div>
+
+              <div className="color-dicing-example">
+                <span>Example with your current bet</span>
+                <div>
+                  <strong>1 match → +${numericBet.toFixed(2)} profit</strong>
+                  <strong>4 matches → +${(numericBet * 3).toFixed(2)} profit</strong>
+                </div>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function App() {
   useScrollReveal();
   const [balance, setBalance] = useState(100);
@@ -1085,6 +1740,7 @@ function App() {
   const [brainrotDepositLoading, setBrainrotDepositLoading] = useState(false);
   const [selected, setSelected] = useState(null);
   const [casesPageOpen, setCasesPageOpen] = useState(false);
+  const [colorDicingOpen, setColorDicingOpen] = useState(false);
   const [casesSearch, setCasesSearch] = useState("");
   const [casesTagFilter, setCasesTagFilter] = useState("All");
   const [casesSort, setCasesSort] = useState("featured");
@@ -3517,7 +4173,23 @@ useEffect(() => {
     }
   };
 
+  const openColorDicing = () => {
+    if (opening) return;
+    if (selected) closeCasePage();
+    if (casesPageOpen) closeCasesPage();
+    setProfileOpen(false);
+    setColorDicingOpen(true);
+    requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+  };
+
+  const closeColorDicing = () => {
+    setColorDicingOpen(false);
+  };
+
   const openCasesPage = () => {
+    setColorDicingOpen(false);
     if (opening) return;
     setSelected(null);
     setResult(null);
@@ -3939,6 +4611,419 @@ useEffect(() => {
 
   return (
     <div className="app">
+
+        <style>{`
+          .color-dicing-page-wrap{
+            position:relative;
+            min-height:calc(100vh - 76px);
+            padding:30px 22px 80px;
+            background:
+              radial-gradient(circle at 50% 0%, rgba(139,92,246,.14), transparent 42%),
+              #080a10;
+          }
+          .color-dicing-back{
+            display:inline-flex;
+            align-items:center;
+            min-height:40px;
+            padding:0 14px;
+            margin:0 auto 18px;
+            border:1px solid rgba(255,255,255,.10);
+            border-radius:10px;
+            background:rgba(255,255,255,.035);
+            color:#d9d4e6;
+            font:800 12px/1 inherit;
+            cursor:pointer;
+          }
+          .color-dicing-back:hover{
+            border-color:rgba(176,132,255,.45);
+            background:rgba(176,132,255,.08);
+          }
+          .color-dicing-page{
+            width:min(1180px,100%);
+            margin:0 auto;
+          }
+          .color-dicing-shell{
+            border:1px solid rgba(255,255,255,.08);
+            border-radius:22px;
+            background:linear-gradient(145deg,rgba(20,23,33,.96),rgba(10,12,18,.98));
+            box-shadow:0 28px 80px rgba(0,0,0,.42);
+            overflow:hidden;
+          }
+          .color-dicing-header{
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+            gap:20px;
+            padding:30px 32px;
+            border-bottom:1px solid rgba(255,255,255,.07);
+          }
+          .color-dicing-header h1{
+            margin:5px 0 7px;
+            font-size:clamp(30px,4vw,48px);
+            line-height:1;
+          }
+          .color-dicing-header p{
+            margin:0;
+            color:#9793a5;
+            font-size:14px;
+          }
+          .color-dicing-live{
+            display:inline-flex;
+            align-items:center;
+            gap:7px;
+            padding:8px 11px;
+            border:1px solid rgba(74,222,128,.22);
+            border-radius:999px;
+            color:#9af0b3;
+            background:rgba(74,222,128,.06);
+            font-size:10px;
+            font-weight:900;
+            letter-spacing:1.2px;
+          }
+          .color-dicing-live span{
+            width:7px;
+            height:7px;
+            border-radius:50%;
+            background:#4ade80;
+            box-shadow:0 0 12px rgba(74,222,128,.8);
+          }
+          .color-dicing-layout{
+            display:grid;
+            grid-template-columns:minmax(0,1.55fr) minmax(290px,.75fr);
+            gap:18px;
+            padding:18px;
+          }
+          .color-dicing-board{
+            min-width:0;
+            padding:24px;
+            border:1px solid rgba(255,255,255,.07);
+            border-radius:18px;
+            background:rgba(7,9,14,.72);
+            text-align:center;
+          }
+          .color-dicing-board-top{
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+            gap:15px;
+            text-align:left;
+          }
+          .color-dicing-board-top > div{
+            display:flex;
+            flex-direction:column;
+            gap:5px;
+          }
+          .color-dicing-label,
+          .color-dicing-bet-display span{
+            color:#777286;
+            font-size:9px;
+            font-weight:900;
+            letter-spacing:1.4px;
+          }
+          .color-dicing-board-top strong{
+            font-size:17px;
+          }
+          .color-dicing-bet-display{
+            text-align:right;
+          }
+          .color-dicing-bet-display strong{
+            color:#fff;
+          }
+          .color-dice-row{
+            display:grid;
+            grid-template-columns:repeat(4,minmax(80px,1fr));
+            gap:16px;
+            max-width:760px;
+            margin:48px auto 30px;
+          }
+          .color-die{
+            aspect-ratio:1;
+            padding:8px;
+            border-radius:19px;
+            background:
+              radial-gradient(circle at 30% 22%,rgba(255,255,255,.32),transparent 24%),
+              linear-gradient(145deg,var(--die-color),rgba(0,0,0,.52));
+            box-shadow:
+              0 16px 30px rgba(0,0,0,.38),
+              0 0 28px color-mix(in srgb,var(--die-color) 28%,transparent);
+            transform:translateY(0) rotate(0deg);
+          }
+          .color-die-face{
+            width:100%;
+            height:100%;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            border:1px solid rgba(255,255,255,.30);
+            border-radius:13px;
+            background:rgba(255,255,255,.07);
+            box-shadow:inset 0 0 22px rgba(0,0,0,.20);
+          }
+          .color-die-dot{
+            width:25%;
+            aspect-ratio:1;
+            border-radius:50%;
+            background:rgba(255,255,255,.88);
+            box-shadow:0 3px 12px rgba(0,0,0,.32);
+          }
+          .color-dice-row.rolling .color-die{
+            animation:colorDiceShake .12s linear infinite alternate;
+          }
+          @keyframes colorDiceShake{
+            from{transform:translateY(-4px) rotate(-3deg) scale(.97)}
+            to{transform:translateY(4px) rotate(3deg) scale(1.03)}
+          }
+          .color-dice-row.rolling .color-die:nth-child(1){animation-delay:-.02s}
+          .color-dice-row.rolling .color-die:nth-child(2){animation-delay:-.07s}
+          .color-dice-row.rolling .color-die:nth-child(3){animation-delay:-.11s}
+          .color-dice-row.rolling .color-die:nth-child(4){animation-delay:-.16s}
+          .color-dice-row.landed-win .color-die{
+            animation:colorDiceWin .48s cubic-bezier(.2,.9,.25,1) both;
+          }
+          .color-dice-row.landed-win .color-die:nth-child(2){animation-delay:.05s}
+          .color-dice-row.landed-win .color-die:nth-child(3){animation-delay:.1s}
+          .color-dice-row.landed-win .color-die:nth-child(4){animation-delay:.15s}
+          .color-dice-row.landed-loss .color-die{
+            animation:colorDiceLoss .34s ease both;
+          }
+          @keyframes colorDiceWin{
+            0%{transform:translateY(8px) scale(.94) rotate(-4deg)}
+            55%{transform:translateY(-10px) scale(1.06) rotate(3deg)}
+            100%{transform:translateY(0) scale(1) rotate(0)}
+          }
+          @keyframes colorDiceLoss{
+            0%,100%{transform:translateX(0)}
+            25%{transform:translateX(-5px)}
+            75%{transform:translateX(5px)}
+          }
+          @media(prefers-reduced-motion:reduce){
+            .color-dice-row.rolling .color-die,
+            .color-dice-row.landed-win .color-die,
+            .color-dice-row.landed-loss .color-die{animation:none}
+          }
+          .color-dicing-match{
+            display:flex;
+            flex-direction:column;
+            gap:4px;
+            margin-bottom:18px;
+          }
+          .color-dicing-match span{
+            color:#777286;
+            font-size:9px;
+            font-weight:900;
+            letter-spacing:1.5px;
+          }
+          .color-dicing-match strong{
+            color:#f4efff;
+            font-size:17px;
+          }
+          .color-dicing-result{
+            display:flex;
+            flex-direction:column;
+            gap:4px;
+            width:min(560px,100%);
+            margin:0 auto 16px;
+            padding:13px 16px;
+            border:1px solid rgba(255,255,255,.08);
+            border-radius:12px;
+            background:rgba(255,255,255,.025);
+          }
+          .color-dicing-result strong{font-size:14px}
+          .color-dicing-result span{font-size:11px;color:#918c9f}
+          .color-dicing-result.win{border-color:rgba(74,222,128,.28)}
+          .color-dicing-result.win strong{color:#74e99a}
+          .color-dicing-result.loss{border-color:rgba(239,68,68,.25)}
+          .color-dicing-result.loss strong{color:#fb7777}
+          .color-dicing-result.reroll{border-color:rgba(250,204,21,.25)}
+          .color-dicing-result.reroll strong{color:#f7d65d}
+          .color-dicing-result.error{border-color:rgba(248,113,113,.25)}
+          .color-dicing-result.error strong{color:#fb8787}
+          .color-dicing-roll{
+            width:min(560px,100%);
+            height:50px;
+            border:0;
+            border-radius:12px;
+            background:linear-gradient(135deg,#9d6cff,#7042d2);
+            color:#fff;
+            font-size:12px;
+            font-weight:950;
+            letter-spacing:1.2px;
+            cursor:pointer;
+            box-shadow:0 12px 30px rgba(126,78,222,.25);
+          }
+          .color-dicing-roll:hover:not(:disabled){
+            filter:brightness(1.08);
+            transform:translateY(-1px);
+          }
+          .color-dicing-roll:disabled{
+            opacity:.58;
+            cursor:not-allowed;
+          }
+          .color-dicing-demo-note{
+            max-width:560px;
+            margin:12px auto 0;
+            color:#666172;
+            font-size:10px;
+            line-height:1.5;
+          }
+          .color-dicing-sidebar{
+            display:flex;
+            flex-direction:column;
+            gap:18px;
+          }
+          .color-dicing-card{
+            padding:20px;
+            border:1px solid rgba(255,255,255,.07);
+            border-radius:17px;
+            background:rgba(255,255,255,.025);
+          }
+          .color-dicing-colors{
+            display:grid;
+            grid-template-columns:repeat(2,minmax(0,1fr));
+            gap:8px;
+            margin-top:13px;
+          }
+          .color-dicing-color{
+            display:flex;
+            align-items:center;
+            gap:9px;
+            min-height:42px;
+            padding:0 10px;
+            border:1px solid rgba(255,255,255,.07);
+            border-radius:10px;
+            background:rgba(255,255,255,.025);
+            color:#aaa5b5;
+            font-size:11px;
+            font-weight:800;
+            cursor:pointer;
+          }
+          .color-dicing-color:hover:not(:disabled){
+            border-color:rgba(255,255,255,.16);
+          }
+          .color-dicing-color.active{
+            border-color:rgba(255,255,255,.28);
+            background:rgba(255,255,255,.07);
+            color:#fff;
+            box-shadow:inset 0 0 0 1px rgba(255,255,255,.03);
+          }
+          .color-dicing-color-dot{
+            width:13px;
+            height:13px;
+            flex-shrink:0;
+            border-radius:50%;
+            box-shadow:0 0 12px color-mix(in srgb,currentColor 35%,transparent);
+          }
+          .color-dicing-input-wrap{
+            display:flex;
+            align-items:center;
+            gap:6px;
+            height:46px;
+            margin-top:13px;
+            padding:0 12px;
+            border:1px solid rgba(255,255,255,.09);
+            border-radius:10px;
+            background:rgba(0,0,0,.18);
+          }
+          .color-dicing-input-wrap span{
+            color:#777286;
+            font-size:14px;
+            font-weight:900;
+          }
+          .color-dicing-input-wrap input{
+            width:100%;
+            border:0;
+            outline:0;
+            background:transparent;
+            color:#fff;
+            font:800 14px/1 inherit;
+          }
+          .color-dicing-quick-bets{
+            display:grid;
+            grid-template-columns:repeat(5,1fr);
+            gap:5px;
+            margin-top:8px;
+          }
+          .color-dicing-quick-bets button{
+            min-height:31px;
+            border:1px solid rgba(255,255,255,.07);
+            border-radius:7px;
+            background:rgba(255,255,255,.025);
+            color:#8f899b;
+            font-size:9px;
+            font-weight:800;
+            cursor:pointer;
+          }
+          .color-dicing-quick-bets button:hover{
+            color:#fff;
+            border-color:rgba(176,132,255,.30);
+          }
+          .color-dicing-rules{
+            display:flex;
+            flex-direction:column;
+            gap:7px;
+            margin-top:13px;
+          }
+          .color-dicing-rules > div{
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+            min-height:32px;
+            padding:0 10px;
+            border-radius:8px;
+            background:rgba(255,255,255,.025);
+          }
+          .color-dicing-rules span{
+            color:#9993a5;
+            font-size:10px;
+            font-weight:700;
+          }
+          .color-dicing-rules strong{
+            color:#d9c6ff;
+            font-size:10px;
+            letter-spacing:.6px;
+          }
+          .color-dicing-rules strong.loss{color:#f87171}
+          .color-dicing-rules strong.reroll{color:#facc15}
+          .color-dicing-rules strong.win{color:#6ee7a0}
+          .color-dicing-example{
+            margin-top:12px;
+            padding-top:12px;
+            border-top:1px solid rgba(255,255,255,.06);
+          }
+          .color-dicing-example > span{
+            color:#6f6979;
+            font-size:9px;
+          }
+          .color-dicing-example > div{
+            display:flex;
+            justify-content:space-between;
+            gap:8px;
+            margin-top:6px;
+          }
+          .color-dicing-example strong{
+            color:#aaa3b7;
+            font-size:9px;
+          }
+          @media(max-width:850px){
+            .color-dicing-layout{grid-template-columns:1fr}
+          }
+          @media(max-width:600px){
+            .color-dicing-page-wrap{padding:18px 10px 55px}
+            .color-dicing-header{padding:22px 18px;align-items:flex-start}
+            .color-dicing-header p{font-size:12px}
+            .color-dicing-live{display:none}
+            .color-dicing-layout{padding:10px}
+            .color-dicing-board{padding:16px 12px}
+            .color-dice-row{gap:7px;margin:34px auto 24px}
+            .color-die{padding:5px;border-radius:12px}
+            .color-die-face{border-radius:8px}
+            .color-dicing-colors{grid-template-columns:repeat(3,1fr)}
+            .color-dicing-color{justify-content:center;padding:0 5px}
+            .color-dicing-color-dot{width:11px}
+            .color-dicing-color span:last-child{font-size:9px}
+            .color-dicing-example > div{flex-direction:column}
+          }
+        `}</style>
       {walletNotification && (
         <div
           className={`wallet-event-toast ${walletNotification.tone}`}
@@ -3984,6 +5069,11 @@ useEffect(() => {
             className="nav-link-button"
             onClick={() => {
               if (opening) return;
+              if (colorDicingOpen) closeColorDicing();
+
+              if (colorDicingOpen) {
+                closeColorDicing();
+              }
 
               if (casesPageOpen) {
                 closeCasesPage();
@@ -4009,6 +5099,7 @@ useEffect(() => {
             className="nav-link-button"
             onClick={() => {
               if (opening) return;
+              if (colorDicingOpen) closeColorDicing();
 
               if (casesPageOpen) {
                 closeCasesPage();
@@ -4033,9 +5124,18 @@ useEffect(() => {
 
           <button
             type="button"
+            className="nav-link-button color-dicing-nav-link"
+            onClick={openColorDicing}
+          >
+            Color Dicing
+          </button>
+
+          <button
+            type="button"
             className="nav-link-button"
             onClick={() => {
               if (opening) return;
+              if (colorDicingOpen) closeColorDicing();
 
               if (casesPageOpen) {
                 closeCasesPage();
@@ -4063,6 +5163,7 @@ useEffect(() => {
             className="nav-link-button"
             onClick={() => {
               if (opening) return;
+              if (colorDicingOpen) closeColorDicing();
               if (casesPageOpen) closeCasesPage();
               if (selected) closeCasePage();
               requestAnimationFrame(() => {
@@ -4080,6 +5181,7 @@ useEffect(() => {
             className="nav-link-button"
             onClick={() => {
               if (opening) return;
+              if (colorDicingOpen) closeColorDicing();
               if (casesPageOpen) closeCasesPage();
               if (selected) closeCasePage();
               requestAnimationFrame(() => {
@@ -4097,6 +5199,7 @@ useEffect(() => {
             className="nav-link-button"
             onClick={() => {
               if (opening) return;
+              if (colorDicingOpen) closeColorDicing();
               if (casesPageOpen) closeCasesPage();
               if (selected) closeCasePage();
               requestAnimationFrame(() => {
@@ -4510,7 +5613,25 @@ useEffect(() => {
         </div>
       </header>
 
-      <main id="home">
+      {colorDicingOpen && (
+        <div className="color-dicing-page-wrap">
+          <button
+            type="button"
+            className="color-dicing-back"
+            onClick={closeColorDicing}
+          >
+            ← Back to CASEX
+          </button>
+
+          <ColorDicingGame
+            authUser={authUser}
+            openAuth={openAuth}
+            onBalanceChange={setBalance}
+          />
+        </div>
+      )}
+
+      <main id="home" style={{ display: colorDicingOpen ? "none" : undefined }}>
         <section className="hero">
           <div className="hero-glow"></div>
 
