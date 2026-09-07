@@ -2938,7 +2938,7 @@ else {
       const response = await apiFetch(`${API}/api/me/brainrot-deposits`, { method: "POST" });
       const data = await response.json();
       if (!response.ok) throw new Error(data.message || data.error || "Failed to create Brainrot deposit.");
-      setBrainrotDeposit({ ...(data.deposit || {}), discordUrl: data.discordUrl || "https://discord.gg/KGQkXU2sav" });
+      setBrainrotDeposit({ ...(data.deposit || {}), discordUrl: data.discordUrl || "https://discord.gg/7hsugeanWk" });
     } catch (error) { alert(error.message); } finally { setBrainrotDepositLoading(false); }
   };
 
@@ -6920,7 +6920,7 @@ useEffect(() => {
   className="primary"
   onClick={() => {
     window.open(
-      "https://discord.gg/KGQkXU2sav",
+      "https://discord.gg/7hsugeanWk",
       "_blank",
       "noopener,noreferrer"
     );
@@ -7175,7 +7175,7 @@ useEffect(() => {
                   <div className="brainrot-deposit-note"><span>!</span><p>Your CASEX balance is only credited after staff confirms what was received.</p></div>
                   <div className="brainrot-deposit-actions">
                     <button type="button" className="secondary-button" onClick={async () => { try { await navigator.clipboard.writeText(String(brainrotDeposit.deposit_code || "")); } catch {} }}>Copy Code</button>
-                    <button type="button" className="primary" onClick={() => window.open(brainrotDeposit.discordUrl || "https://discord.gg/KGQkXU2sav", "_blank", "noopener,noreferrer")}>Open Discord</button>
+                    <button type="button" className="primary" onClick={() => window.open(brainrotDeposit.discordUrl || "https://discord.gg/7hsugeanWk", "_blank", "noopener,noreferrer")}>Open Discord</button>
                   </div>
                   <button type="button" className="secondary-button brainrot-deposit-done" onClick={closeBrainrotDeposit}>Done</button>
                 </div>
