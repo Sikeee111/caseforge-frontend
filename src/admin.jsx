@@ -498,6 +498,10 @@ function Admin() {
   const [analyticsUpdatedAt, setAnalyticsUpdatedAt] = useState(null);
   const [analyticsResetting, setAnalyticsResetting] = useState(false);
   const [adminView, setAdminView] = useState("dashboard");
+  const [colorDicingStats, setColorDicingStats] = useState(null);
+  const [colorDicingLoading, setColorDicingLoading] = useState(false);
+  const [colorDicingFilter, setColorDicingFilter] = useState("all");
+  const [colorDicingSearch, setColorDicingSearch] = useState("");
   const [assetSearch, setAssetSearch] = useState("");
   const [assetRarity, setAssetRarity] = useState("all");
   const [selectedAssetIds, setSelectedAssetIds] = useState(() => new Set());
@@ -857,6 +861,34 @@ setEditingCase({
       setError(err.message);
     } finally {
       setAnalyticsLoading(false);
+    }
+  };
+
+  const loadColorDicingStats = async () => {
+    try {
+      setColorDicingLoading(true);
+      const params = new URLSearchParams();
+      if (colorDicingFilter && colorDicingFilter !== "all") {
+        params.set("status", colorDicingFilter);
+      }
+      if (colorDicingSearch.trim()) {
+        params.set("search", colorDicingSearch.trim());
+      }
+      const query = params.toString() ? `?${params.toString()}` : "";
+      const response = await apiFetch(
+        `${API}/api/admin/color-dicing${query}`,
+        { cache: "no-store" }
+      );
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to load Color Dicing stats");
+      }
+      setColorDicingStats(data);
+    } catch (err) {
+      console.error("Color Dicing stats load failed:", err);
+      setError(err.message || "Failed to load Color Dicing stats");
+    } finally {
+      setColorDicingLoading(false);
     }
   };
 
@@ -3199,6 +3231,7 @@ body: JSON.stringify({
               loadCases();
               loadItems();
               loadAnalytics();
+              loadColorDicingStats();
               loadAdminUsers();
               loadAdminActivity();
               loadAdminPayments();
@@ -3226,7 +3259,10 @@ body: JSON.stringify({
             <button type="button" className="admin-sidebar-item" onClick={() => document.querySelector(".admin-analytics")?.scrollIntoView({ behavior: "smooth", block: "start" })}>
               <span className="admin-sidebar-icon">▥</span><span>Analytics</span>
             </button>
-            <button type="button" className={adminView === "cases" ? "admin-sidebar-item active" : "admin-sidebar-item"} onClick={() => setAdminView("cases")}>
+                         <button type="button" className={adminView === "color-dicing" ? "admin-sidebar-item active" : "admin-sidebar-item"} onClick={() => { setAdminView("color-dicing"); loadColorDicingStats(); }}>
+               <span className="admin-sidebar-icon">◈</span><span>Color Dicing</span>
+             </button>
+<button type="button" className={adminView === "cases" ? "admin-sidebar-item active" : "admin-sidebar-item"} onClick={() => setAdminView("cases")}>
               <span className="admin-sidebar-icon">▣</span><span>Cases</span>
             </button>
            <button
@@ -3409,7 +3445,44 @@ body: JSON.stringify({
           </section>
         )}
 
-        <section className="admin-command-center">
+        {adminView === "color-dicing" && (
+          <section className="admin-management-card" style={{ marginBottom: "18px" }}>
+            <div className="admin-management-head">
+              <div><div className="admin-eyebrow">CASEX ORIGINAL</div><h2>Color Dicing Statistics</h2><p>Wins, losses, rerolls, wagers, payouts and house performance.</p></div>
+              <button type="button" className="admin-secondary-button" onClick={loadColorDicingStats} disabled={colorDicingLoading}>{colorDicingLoading ? "Loading..." : "↻ Refresh"}</button>
+            </div>
+            {!colorDicingStats ? <div className="admin-management-empty">{colorDicingLoading ? "Loading Color Dicing statistics..." : "No Color Dicing statistics loaded yet."}</div> : <>
+              <div className="admin-analytics-grid" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))", marginBottom: "12px" }}>
+                <div className="admin-stat-card"><div className="admin-stat-icon openings">◈</div><div><span>TOTAL GAMES</span><strong>{Number(colorDicingStats.overview?.games || 0).toLocaleString()}</strong><small>All recorded games</small></div></div>
+                <div className="admin-stat-card"><div className="admin-stat-icon revenue">$</div><div><span>TOTAL BETS</span><strong>{money(colorDicingStats.overview?.betsCents || 0)}</strong><small>Total wagered</small></div></div>
+                <div className="admin-stat-card"><div className="admin-stat-icon rewards">✓</div><div><span>WINS / LOSSES</span><strong>{Number(colorDicingStats.overview?.wins || 0).toLocaleString()} / {Number(colorDicingStats.overview?.losses || 0).toLocaleString()}</strong><small>Final game outcomes</small></div></div>
+                <div className="admin-stat-card admin-stat-card-profit"><div className="admin-stat-icon profit">≈</div><div><span>HOUSE PROFIT</span><strong>{money(colorDicingStats.overview?.houseProfitCents || 0)}</strong><small>Net against players</small></div></div>
+              </div>
+              <div className="admin-analytics-secondary">
+                <div className="admin-analytics-highlight"><span>REROLLS</span><strong>{Number(colorDicingStats.overview?.rerolls || 0).toLocaleString()}</strong><small>Free reroll rolls</small></div>
+                <div className="admin-analytics-highlight"><span>TOTAL PAYOUTS</span><strong>{money(colorDicingStats.overview?.payoutCents || 0)}</strong><small>Returned to players</small></div>
+                <div className="admin-analytics-highlight"><span>PLAYER PROFIT</span><strong>{money(colorDicingStats.overview?.playerProfitCents || 0)}</strong><small>Net player result</small></div>
+              </div>
+              <div className="admin-management-toolbar" style={{ marginTop: "14px" }}>
+                <div className="admin-search-wrap"><span>⌕</span><input value={colorDicingSearch} onChange={(event) => setColorDicingSearch(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") loadColorDicingStats(); }} placeholder="Search username or game ID..." /></div>
+                <select className="admin-select" value={colorDicingFilter} onChange={(event) => setColorDicingFilter(event.target.value)}>
+                  <option value="all">All results</option><option value="won">Wins</option><option value="lost">Losses</option><option value="active">Active</option>
+                </select>
+                <button type="button" className="admin-secondary-button" onClick={loadColorDicingStats} disabled={colorDicingLoading}>{colorDicingLoading ? "Loading..." : "Apply filters"}</button>
+              </div>
+              <div className="admin-activity-table-wrap"><table className="admin-activity-table">
+                <thead><tr><th>Game</th><th>User</th><th>Color</th><th>Bet</th><th>Roll</th><th>Matches</th><th>Result</th><th>Payout</th><th>Profit</th><th>Date</th></tr></thead>
+                <tbody>{(colorDicingStats.games || []).length === 0 ? <tr><td colSpan="10" className="admin-table-empty">No Color Dicing games found.</td></tr> : colorDicingStats.games.map((game) => {
+                  const status = String(game.status || "").toLowerCase(), profit = Number(game.profit_cents || 0), color = String(game.selected_color || game.selectedColor || "—");
+                  return <tr key={game.id}><td><strong>#{game.id}</strong></td><td><strong>{game.username || "Unknown"}</strong><small>#{game.user_id || "—"}</small></td><td style={{ textTransform: "capitalize", fontWeight: 700 }}>{color}</td><td>{money(game.bet_cents)}</td><td>{Number(game.roll_number || 0)}</td><td>{Number(game.matches || 0)}/4</td><td><span className={`admin-payment-status ${status === "won" ? "approved" : status === "lost" ? "rejected" : "pending"}`}>{status === "won" ? "WIN" : status === "lost" ? "LOSS" : status.toUpperCase()}</span></td><td>{money(game.payout_cents)}</td><td className={profit > 0 ? "admin-table-positive" : profit < 0 ? "admin-table-negative" : "admin-table-muted"}>{money(profit)}</td><td className="admin-table-muted">{game.created_at ? new Date(game.created_at).toLocaleString() : "—"}</td></tr>;
+                })}</tbody>
+              </table></div>
+            </>}
+          </section>
+        )}
+
+        {adminView !== "color-dicing" && (
+          <section className="admin-command-center">
           <div className="admin-command-head">
             <div>
               <div className="admin-eyebrow">COMMAND CENTER</div>
@@ -3522,6 +3595,7 @@ body: JSON.stringify({
             </button>
           </div>
         </section>
+        )}
 
         {adminView === "dashboard" && (
         <section className="admin-user-snapshot">
