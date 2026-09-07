@@ -1576,6 +1576,7 @@ function MinesGame({ authUser, openAuth, onBalanceChange, soundEnabled }) {
   const [recentGames, setRecentGames] = useState([]);
   const [errorMessage, setErrorMessage] = useState("");
   const [mineMenuOpen, setMineMenuOpen] = useState(false);
+  const [requestingTile, setRequestingTile] = useState(null);
 
   const minesAudioRef = useRef(null);
 
@@ -1843,6 +1844,7 @@ function MinesGame({ authUser, openAuth, onBalanceChange, soundEnabled }) {
 
     setActionLoading(true);
     setRevealingTile(index);
+    setRequestingTile(index);
     setErrorMessage("");
     primeMinesAudio();
 
@@ -1890,6 +1892,7 @@ function MinesGame({ authUser, openAuth, onBalanceChange, soundEnabled }) {
       }
     } finally {
       setRevealingTile(null);
+      setRequestingTile(null);
       setActionLoading(false);
     }
   };
@@ -2121,12 +2124,18 @@ function MinesGame({ authUser, openAuth, onBalanceChange, soundEnabled }) {
                   <button
                     key={index}
                     type="button"
-                    className={`mines-tile ${isShown && !isMine ? "revealed" : ""} ${isMine && showFinishedBoard ? "mine" : ""} ${revealingTile === index ? "is-revealing" : ""}`}
+                    className={`mines-tile ${isShown && !isMine ? "revealed" : ""} ${isMine && showFinishedBoard ? "mine" : ""} ${revealingTile === index ? "is-revealing" : ""} ${requestingTile === index ? "is-pending" : ""}`}
+                    onPointerDown={() => {
+                      if (active && !actionLoading && !revealedPositions.has(index)) {
+                        primeMinesAudio();
+                        setRequestingTile(index);
+                      }
+                    }}
                     onClick={() => revealTile(index)}
                     disabled={disabled}
                     aria-label={isMine && showFinishedBoard ? "Mine" : isShown ? "Safe tile" : "Hidden tile"}
                   >
-                    {isMine && showFinishedBoard ? "✕" : isShown ? "◆" : "?"}
+                    {isMine && showFinishedBoard ? "✕" : isShown ? "◆" : requestingTile === index ? "…" : "?"}
                   </button>
                 );
               })}
