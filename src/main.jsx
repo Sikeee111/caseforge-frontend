@@ -1203,6 +1203,110 @@ function ColorDicingGame({ authUser, openAuth, onBalanceChange }) {
     }
   };
 
+  const submitDemoRoll = async () => {
+    if (rolling || loadingGame) return;
+
+    setRolling(true);
+    setErrorMessage("");
+    setResult(null);
+
+    try {
+      const demoDice = Array.from(
+        { length: 4 },
+        () => colors[Math.floor(Math.random() * colors.length)].id
+      );
+
+      const demoMatches = demoDice.filter(
+        (colorId) => colorId === selectedColor
+      ).length;
+
+      // Reuse the existing rolling animation, but keep the demo entirely
+      // client-side. No wallet, game, transaction, or admin record is touched.
+      const data = await animateToServerDice(
+        new Promise((resolve) => {
+          window.setTimeout(() => {
+            resolve({
+              game: {
+                dice: demoDice,
+                selectedColor,
+                matches: demoMatches,
+                status: demoMatches === 2 || demoMatches === 3 ? "active" : demoMatches === 0 ? "lost" : "won",
+                betCents: Math.round(Math.max(0, Number(betAmount) || 0) * 100),
+                payoutCents:
+                  demoMatches === 1
+                    ? Math.round(Math.max(0, Number(betAmount) || 0) * 100 * 2)
+                    : demoMatches >= 4
+                      ? Math.round(Math.max(0, Number(betAmount) || 0) * 100 * 4)
+                      : 0,
+                profitCents:
+                  demoMatches === 1
+                    ? Math.round(Math.max(0, Number(betAmount) || 0) * 100)
+                    : demoMatches >= 4
+                      ? Math.round(Math.max(0, Number(betAmount) || 0) * 100 * 3)
+                      : 0,
+              },
+            });
+          }, 260);
+        })
+      );
+
+      const game = data?.game;
+
+      if (!game) {
+        throw new Error("DEMO_ROLL_FAILED");
+      }
+
+      setDice(game.dice);
+      setSelectedColor(game.selectedColor);
+      const demoProfit = Number(game.profitCents || 0);
+      let demoResult;
+
+      if (demoMatches === 0) {
+        demoResult = {
+          type: "loss",
+          matches: 0,
+          title: "Demo: You lose",
+          message: "No dice matched your selected color. No real bet was placed.",
+        };
+      } else if (demoMatches === 1) {
+        demoResult = {
+          type: "win",
+          matches: 1,
+          multiplier: 1,
+          title: "Demo: You win ×1",
+          message: `A 1-match result would return ${formatMoney(game.payoutCents)} on a ${formatMoney(game.betCents)} bet. No real balance changed.`,
+        };
+      } else if (demoMatches === 2 || demoMatches === 3) {
+        demoResult = {
+          type: "reroll",
+          matches: demoMatches,
+          title: "Demo: Reroll",
+          message: `${demoMatches} dice matched. In a real game, your bet would stay locked for a free reroll.`,
+        };
+      } else {
+        demoResult = {
+          type: "win",
+          matches: 4,
+          multiplier: 3,
+          title: "Demo: You win ×3",
+          message: `A 4-match result would return ${formatMoney(game.payoutCents)} on a ${formatMoney(game.betCents)} bet. No real balance changed.`,
+        };
+      }
+
+      setResult({
+        ...demoResult,
+        demo: true,
+        demoProfit,
+      });
+      playDiceLand(Number(game.matches || 0));
+    } catch (error) {
+      console.error("Color Dicing demo roll failed:", error);
+      setErrorMessage("The demo roll could not be completed. Please try again.");
+    } finally {
+      setRolling(false);
+    }
+  };
+
   const rollDice = () => submitRoll(false);
   const rerollDice = () => submitRoll(true);
 
@@ -1287,6 +1391,7 @@ function ColorDicingGame({ authUser, openAuth, onBalanceChange }) {
 
             {result && (
               <div className={`color-dicing-result ${result.type}`}>
+                {result.demo && <span className="color-dicing-demo-badge">DEMO RESULT</span>}
                 <strong>{result.title}</strong>
                 <span>{result.message}</span>
               </div>
@@ -1299,20 +1404,31 @@ function ColorDicingGame({ authUser, openAuth, onBalanceChange }) {
               </div>
             )}
 
-            <button
-              type="button"
-              className="color-dicing-roll"
-              onClick={actionIsReroll ? rerollDice : rollDice}
-              disabled={rolling || loadingGame || (betLocked && !actionIsReroll)}
-            >
-              {rolling
-                ? "ROLLING..."
-                : loadingGame
-                ? "LOADING..."
-                : actionIsReroll
-                ? "REROLL DICE"
-                : "ROLL DICE"}
-            </button>
+            <div className="color-dicing-actions">
+              <button
+                type="button"
+                className="color-dicing-roll"
+                onClick={actionIsReroll ? rerollDice : rollDice}
+                disabled={rolling || loadingGame || (betLocked && !actionIsReroll)}
+              >
+                {rolling
+                  ? "ROLLING..."
+                  : loadingGame
+                  ? "LOADING..."
+                  : actionIsReroll
+                  ? "REROLL DICE"
+                  : "ROLL DICE"}
+              </button>
+
+              <button
+                type="button"
+                className="color-dicing-demo-roll"
+                onClick={submitDemoRoll}
+                disabled={rolling || loadingGame}
+              >
+                {rolling ? "DEMO ROLL..." : "DEMO ROLL"}
+              </button>
+            </div>
 
             {betLocked && (
               <div className="color-dicing-demo-note">
@@ -4838,7 +4954,7 @@ useEffect(() => {
           .color-dicing-result.reroll strong{color:#f7d65d}
           .color-dicing-result.error{border-color:rgba(248,113,113,.25)}
           .color-dicing-result.error strong{color:#fb8787}
-          .color-dicing-roll{
+          .color-dicing-actions{\n            width:min(560px,100%);\n            display:grid;\n            grid-template-columns:1fr auto;\n            gap:10px;\n            margin:0 auto;\n          }\n          .color-dicing-demo-roll{\n            height:50px;\n            padding:0 18px;\n            border:1px solid rgba(255,255,255,.12);\n            border-radius:12px;\n            background:rgba(255,255,255,.045);\n            color:#c9c3d3;\n            font-size:11px;\n            font-weight:950;\n            letter-spacing:1px;\n            cursor:pointer;\n            transition:.2s ease;\n          }\n          .color-dicing-demo-roll:hover:not(:disabled){\n            border-color:rgba(168,124,255,.42);\n            background:rgba(157,108,255,.10);\n            color:#fff;\n            transform:translateY(-1px);\n          }\n          .color-dicing-demo-roll:disabled{\n            opacity:.58;\n            cursor:not-allowed;\n          }\n          .color-dicing-demo-badge{\n            display:block;\n            margin-bottom:5px;\n            color:#a98cff;\n            font-size:9px;\n            font-weight:950;\n            letter-spacing:1.3px;\n          }\n          @media (max-width:700px){\n            .color-dicing-actions{\n              grid-template-columns:1fr;\n            }\n          }\n          .color-dicing-roll{
             width:min(560px,100%);
             height:50px;
             border:0;
