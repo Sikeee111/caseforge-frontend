@@ -1,0 +1,432 @@
+.admin-brainrot-deposit-items{
+  padding-bottom:18px;
+}
+
+.admin-brainrot-deposit-items-layout{
+  display:grid;
+  grid-template-columns:minmax(310px,.72fr) minmax(0,1.28fr);
+  gap:16px;
+  align-items:start;
+}
+
+.admin-brainrot-deposit-form,
+.admin-brainrot-deposit-list{
+  min-width:0;
+  padding:16px;
+  border:1px solid #292b37;
+  border-radius:15px;
+  background:linear-gradient(180deg,#11121a 0%,#0d0e14 100%);
+}
+
+.admin-brainrot-deposit-form{
+  display:grid;
+  gap:12px;
+}
+
+.admin-brainrot-deposit-form-head,
+.admin-brainrot-deposit-list-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:14px;
+}
+
+.admin-brainrot-deposit-form-head h3,
+.admin-brainrot-deposit-list-head h3{
+  margin:4px 0;
+  font-size:18px;
+}
+
+.admin-brainrot-deposit-form label{
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+}
+
+.admin-brainrot-deposit-form label > span{
+  color:#858896;
+  font-size:8px;
+  font-weight:900;
+  letter-spacing:1px;
+  text-transform:uppercase;
+}
+
+.admin-brainrot-deposit-form input:not([type="checkbox"]),
+.admin-brainrot-deposit-form select{
+  width:100%;
+  min-height:40px;
+  box-sizing:border-box;
+  border:1px solid #2a2c37;
+  border-radius:9px;
+  background:#0a0b10;
+  color:#eceaf1;
+  padding:0 10px;
+  outline:0;
+  font-size:11px;
+}
+
+.admin-brainrot-deposit-form input:focus,
+.admin-brainrot-deposit-form select:focus{
+  border-color:#8b5cf6;
+  box-shadow:0 0 0 3px rgba(139,92,246,.08);
+}
+
+.deposit-item-image-picker{
+  width:100%;
+  min-height:170px;
+  box-sizing:border-box;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:14px;
+  padding:16px;
+  border:1px dashed #51407b;
+  border-radius:13px;
+  background:#090a10;
+  color:#8e92a0;
+  text-align:left;
+  cursor:pointer;
+  transition:border-color .18s ease,background .18s ease,transform .18s ease;
+}
+
+.deposit-item-image-picker:hover:not(:disabled),
+.deposit-item-image-picker.is-dragging{
+  border-color:#9b74ff;
+  background:#13101c;
+  transform:translateY(-1px);
+}
+
+.deposit-item-image-picker:disabled{
+  opacity:.55;
+  cursor:not-allowed;
+}
+
+.deposit-item-image-picker input{
+  display:none;
+}
+
+.deposit-item-image-preview{
+  width:110px;
+  height:110px;
+  border-radius:12px;
+  object-fit:contain;
+  background:#07080c;
+  flex:0 0 auto;
+}
+
+.deposit-item-upload-icon{
+  width:48px;
+  height:48px;
+  display:grid;
+  place-items:center;
+  border:1px solid #42365d;
+  border-radius:13px;
+  background:#161120;
+  color:#b493ff;
+  font-size:22px;
+  font-weight:900;
+}
+
+.deposit-item-image-copy{
+  display:flex;
+  flex-direction:column;
+  gap:5px;
+  min-width:0;
+}
+
+.deposit-item-image-copy strong{
+  color:#f0eef6;
+  font-size:12px;
+}
+
+.deposit-item-image-copy small{
+  color:#6f7280;
+  font-size:9px;
+  line-height:1.5;
+}
+
+.admin-brainrot-deposit-form-row{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+}
+
+.admin-brainrot-deposit-money{
+  min-height:40px;
+  display:flex;
+  align-items:center;
+  border:1px solid #2a2c37;
+  border-radius:9px;
+  background:#0a0b10;
+  overflow:hidden;
+}
+
+.admin-brainrot-deposit-money b{
+  padding-left:10px;
+  color:#aa7bff;
+  font-size:11px;
+}
+
+.admin-brainrot-deposit-money input{
+  border:0!important;
+  box-shadow:none!important;
+  background:transparent!important;
+}
+
+.admin-brainrot-deposit-active{
+  display:flex!important;
+  flex-direction:row!important;
+  align-items:flex-start;
+  gap:9px!important;
+  padding:10px;
+  border:1px solid #252832;
+  border-radius:10px;
+  background:#0a0b10;
+}
+
+.admin-brainrot-deposit-active input[type="checkbox"]{
+  margin-top:2px;
+  accent-color:#8b5cf6;
+}
+
+.admin-brainrot-deposit-active span{
+  display:flex;
+  flex-direction:column;
+  gap:3px;
+  text-transform:none!important;
+  letter-spacing:0!important;
+}
+
+.admin-brainrot-deposit-active strong{
+  color:#e9e8ef;
+  font-size:10px;
+}
+
+.admin-brainrot-deposit-active small{
+  color:#666a77;
+  font-size:8px;
+  line-height:1.45;
+}
+
+.admin-brainrot-deposit-list{
+  overflow:hidden;
+}
+
+.admin-brainrot-deposit-list-head{
+  align-items:flex-end;
+  margin-bottom:14px;
+}
+
+.admin-brainrot-deposit-list-head p{
+  margin:4px 0 0;
+  color:#737684;
+  font-size:9px;
+}
+
+.admin-brainrot-deposit-list-head .admin-search-wrap{
+  width:min(250px,100%);
+}
+
+.admin-brainrot-deposit-table-wrap{
+  overflow:auto;
+  border:1px solid #252832;
+  border-radius:11px;
+}
+
+.admin-brainrot-deposit-table{
+  width:100%;
+  min-width:700px;
+  border-collapse:collapse;
+}
+
+.admin-brainrot-deposit-table th,
+.admin-brainrot-deposit-table td{
+  padding:10px 11px;
+  border-bottom:1px solid #20222b;
+  text-align:left;
+  vertical-align:middle;
+}
+
+.admin-brainrot-deposit-table th{
+  color:#646876;
+  font-size:7px;
+  font-weight:900;
+  letter-spacing:1px;
+  text-transform:uppercase;
+  background:#0a0b10;
+}
+
+.admin-brainrot-deposit-table tbody tr:last-child td{
+  border-bottom:0;
+}
+
+.admin-brainrot-deposit-table tbody tr:hover{
+  background:#101118;
+}
+
+.admin-brainrot-deposit-table tbody tr.is-inactive{
+  opacity:.58;
+}
+
+.admin-brainrot-deposit-item-cell{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  min-width:190px;
+}
+
+.admin-brainrot-deposit-thumb{
+  width:48px;
+  height:48px;
+  flex:0 0 48px;
+  display:grid;
+  place-items:center;
+  border:1px solid #292c37;
+  border-radius:9px;
+  background:#08090e;
+  overflow:hidden;
+}
+
+.admin-brainrot-deposit-thumb img{
+  width:100%;
+  height:100%;
+  object-fit:contain;
+  display:block;
+}
+
+.admin-brainrot-deposit-thumb span{
+  color:#676b78;
+  font-size:18px;
+}
+
+.admin-brainrot-deposit-item-cell > div:last-child{
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+  gap:3px;
+}
+
+.admin-brainrot-deposit-item-cell strong{
+  color:#eeeef5;
+  font-size:10px;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+.admin-brainrot-deposit-item-cell small{
+  color:#666a77;
+  font-size:7px;
+}
+
+.admin-brainrot-rarity,
+.admin-brainrot-status{
+  display:inline-flex;
+  align-items:center;
+  min-height:24px;
+  padding:5px 7px;
+  border-radius:7px;
+  font-size:7px;
+  font-weight:900;
+}
+
+.admin-brainrot-rarity{
+  border:1px solid #2d303a;
+  background:#0b0c11;
+  color:#a5a8b2;
+}
+
+.admin-brainrot-rarity.rare{color:#55a8ff;border-color:#2a5174;background:#0c1620}
+.admin-brainrot-rarity.epic{color:#c080ff;border-color:#50346d;background:#160f20}
+.admin-brainrot-rarity.legendary{color:#ffd45e;border-color:#67562c;background:#211c0c}
+.admin-brainrot-rarity.secret{color:#ff68df;border-color:#6b315e;background:#210e1c}
+
+.admin-brainrot-value{
+  color:#bf9cff;
+  font-size:11px;
+  font-weight:900;
+  white-space:nowrap;
+}
+
+.admin-brainrot-status.active{
+  border:1px solid #25634c;
+  background:#0f241b;
+  color:#65e1a7;
+}
+
+.admin-brainrot-status.inactive{
+  border:1px solid #5d552e;
+  background:#201d0e;
+  color:#d8ca74;
+}
+
+.admin-brainrot-actions{
+  display:flex;
+  gap:6px;
+  flex-wrap:wrap;
+}
+
+.admin-brainrot-actions button{
+  min-height:31px;
+  padding:6px 8px!important;
+  font-size:8px!important;
+}
+
+.admin-danger-button{
+  min-height:31px;
+  padding:6px 8px;
+  border:1px solid #642d3a;
+  border-radius:8px;
+  background:#241116;
+  color:#ff8fa3;
+  font-size:8px;
+  font-weight:900;
+  cursor:pointer;
+}
+
+.admin-danger-button:hover:not(:disabled){
+  border-color:#a84055;
+  background:#3a1720;
+  color:#fff;
+}
+
+.admin-brainrot-deposit-empty{
+  min-height:160px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  flex-direction:column;
+  gap:5px;
+  border:1px dashed #2d2f3b;
+  border-radius:11px;
+  background:#0b0c11;
+  color:#767a88;
+  text-align:center;
+  font-size:9px;
+}
+
+.admin-brainrot-deposit-empty strong{
+  color:#eceaf2;
+  font-size:11px;
+}
+
+@media(max-width:1100px){
+  .admin-brainrot-deposit-items-layout{
+    grid-template-columns:1fr;
+  }
+}
+
+@media(max-width:760px){
+  .admin-brainrot-deposit-form-row{
+    grid-template-columns:1fr;
+  }
+
+  .admin-brainrot-deposit-list-head{
+    flex-direction:column;
+    align-items:stretch;
+  }
+
+  .admin-brainrot-deposit-list-head .admin-search-wrap{
+    width:100%;
+  }
+}

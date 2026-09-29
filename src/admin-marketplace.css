@@ -1,0 +1,658 @@
+/* Marketplace admin — clean, compact, full-width layout */
+.admin-marketplace-panel{
+  position:relative;
+  margin-top:8px;
+  padding:6px 0 18px;
+  box-sizing:border-box;
+}
+
+.admin-marketplace-header{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:24px;
+  margin:0 0 18px;
+}
+
+.admin-marketplace-header h2{
+  margin:4px 0 5px;
+  font-size:25px;
+  line-height:1.05;
+}
+
+.admin-marketplace-header p{
+  margin:0;
+  max-width:700px;
+  color:#767987;
+  font-size:11px;
+  line-height:1.55;
+}
+
+.admin-marketplace-game-switcher{
+  display:flex;
+  gap:4px;
+  padding:4px;
+  border:1px solid #292b36;
+  border-radius:11px;
+  background:#0b0c11;
+  flex:0 0 auto;
+}
+
+.admin-marketplace-game-switcher button{
+  border:0;
+  border-radius:8px;
+  padding:9px 13px;
+  background:transparent;
+  color:#7d808d;
+  font-size:9px;
+  font-weight:900;
+  cursor:pointer;
+}
+
+.admin-marketplace-game-switcher button.active{
+  background:linear-gradient(135deg,#9868ff,#7745dd);
+  color:#fff;
+  box-shadow:0 6px 18px rgba(119,69,221,.22);
+}
+
+.admin-marketplace-kicker{
+  display:block;
+  color:#a176ff;
+  font-size:8px;
+  font-weight:900;
+  letter-spacing:1.7px;
+  text-transform:uppercase;
+}
+
+.admin-marketplace-create-card{
+  padding:18px;
+  border:1px solid #292b37;
+  border-radius:15px;
+  background:linear-gradient(180deg,#11121a 0%,#0d0e14 100%);
+  box-sizing:border-box;
+}
+
+.admin-marketplace-section-title{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:18px;
+  margin-bottom:15px;
+}
+
+.admin-marketplace-section-title h3,
+.admin-marketplace-list-head h3,
+.admin-marketplace-modal-head h3{
+  margin:4px 0 4px;
+}
+
+.admin-marketplace-section-title h3{
+  font-size:18px;
+}
+
+.admin-marketplace-section-title p,
+.admin-marketplace-list-head p,
+.admin-marketplace-modal-head p{
+  margin:0;
+  color:#737684;
+  font-size:10px;
+  line-height:1.5;
+}
+
+.admin-marketplace-game-pill{
+  flex:0 0 auto;
+  padding:7px 10px;
+  border:1px solid #433368;
+  border-radius:8px;
+  color:#b99bff;
+  background:#171223;
+  font-size:8px;
+  font-weight:900;
+}
+
+.admin-marketplace-create-layout,
+.admin-marketplace-edit-layout{
+  display:grid;
+  grid-template-columns:minmax(300px,.9fr) minmax(0,1.1fr);
+  gap:16px;
+  align-items:stretch;
+}
+
+.marketplace-image-picker{
+  width:100%;
+  min-height:218px;
+  box-sizing:border-box;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:15px;
+  padding:18px;
+  border:1px dashed #51407b;
+  border-radius:13px;
+  background:#090a10;
+  color:#8e92a0;
+  text-align:center;
+  cursor:pointer;
+  transition:border-color .18s ease,background .18s ease,transform .18s ease;
+}
+
+.marketplace-image-picker:hover:not(:disabled),
+.marketplace-image-picker.is-dragging{
+  border-color:#9b74ff;
+  background:#13101c;
+  transform:translateY(-1px);
+}
+
+.marketplace-image-picker:disabled{
+  opacity:.55;
+  cursor:not-allowed;
+}
+
+.marketplace-image-preview{
+  width:145px;
+  height:145px;
+  object-fit:contain;
+  border-radius:10px;
+  background:#07080c;
+  flex:0 0 auto;
+}
+
+.marketplace-upload-icon{
+  width:54px;
+  height:54px;
+  display:grid;
+  place-items:center;
+  flex:0 0 54px;
+  border:1px solid #42365d;
+  border-radius:14px;
+  background:#161120;
+  color:#b493ff;
+  font-size:23px;
+  font-weight:900;
+}
+
+.marketplace-image-copy{
+  display:flex;
+  flex-direction:column;
+  gap:5px;
+  min-width:0;
+}
+
+.marketplace-image-copy strong{
+  color:#f0eef6;
+  font-size:12px;
+}
+
+.marketplace-image-copy small{
+  color:#6f7280;
+  font-size:9px;
+  line-height:1.5;
+}
+
+.admin-marketplace-form-fields{
+  display:grid;
+  gap:11px;
+  align-content:start;
+}
+
+.admin-marketplace-form-fields label{
+  display:flex;
+  flex-direction:column;
+  gap:5px;
+}
+
+.admin-marketplace-form-fields label>span{
+  color:#858896;
+  font-size:8px;
+  font-weight:900;
+  letter-spacing:1px;
+  text-transform:uppercase;
+}
+
+.admin-marketplace-form-fields input,
+.admin-marketplace-form-fields select{
+  width:100%;
+  min-height:40px;
+  box-sizing:border-box;
+  border:1px solid #2a2c37;
+  border-radius:9px;
+  background:#0a0b10;
+  color:#eceaf1;
+  padding:0 10px;
+  outline:0;
+  font-size:11px;
+}
+
+.admin-marketplace-form-fields input:focus,
+.admin-marketplace-form-fields select:focus{
+  border-color:#8b5cf6;
+  box-shadow:0 0 0 3px rgba(139,92,246,.08);
+}
+
+.admin-marketplace-form-row{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+}
+
+.admin-marketplace-money-input{
+  min-height:40px;
+  display:flex;
+  align-items:center;
+  border:1px solid #2a2c37;
+  border-radius:9px;
+  background:#0a0b10;
+  overflow:hidden;
+}
+
+.admin-marketplace-money-input b{
+  padding-left:10px;
+  color:#aa7bff;
+  font-size:11px;
+}
+
+.admin-marketplace-money-input input{
+  border:0!important;
+  box-shadow:none!important;
+  background:transparent!important;
+}
+
+.admin-marketplace-create-button{
+  min-height:42px;
+  margin-top:1px;
+}
+
+.admin-marketplace-alert{
+  display:flex;
+  align-items:center;
+  gap:9px;
+  margin-top:12px;
+  padding:10px 12px;
+  border-radius:10px;
+  font-size:9px;
+}
+
+.admin-marketplace-alert strong{
+  font-size:8px;
+  letter-spacing:1px;
+  text-transform:uppercase;
+}
+
+.admin-marketplace-alert span{
+  flex:1;
+  min-width:0;
+}
+
+.admin-marketplace-alert button{
+  border:0;
+  background:transparent;
+  color:inherit;
+  font-size:15px;
+  cursor:pointer;
+}
+
+.admin-marketplace-alert.success{
+  border:1px solid #1d654c;
+  background:#0b1c15;
+  color:#65e7ae;
+}
+
+.admin-marketplace-alert.error{
+  border:1px solid #6f2e3d;
+  background:#201016;
+  color:#ff98aa;
+}
+
+.admin-marketplace-list-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:15px;
+  margin:19px 0 11px;
+}
+
+.admin-marketplace-list-head h3{
+  font-size:16px;
+}
+
+.admin-marketplace-list-head p{
+  margin-top:3px;
+}
+
+.admin-marketplace-list{
+  display:grid;
+  gap:9px;
+}
+
+.admin-marketplace-list-grid{
+  display:grid;
+  gap:9px;
+}
+
+.admin-marketplace-card{
+  min-width:0;
+  display:grid;
+  grid-template-columns:86px minmax(0,1fr) 105px 85px auto;
+  align-items:center;
+  gap:14px;
+  padding:10px;
+  border:1px solid #292b36;
+  border-radius:12px;
+  background:#0d0e14;
+  box-sizing:border-box;
+}
+
+.admin-marketplace-card:hover{
+  border-color:#373442;
+  background:#101118;
+}
+
+.admin-marketplace-card.is-paused{
+  opacity:.7;
+}
+
+.admin-marketplace-card-image{
+  position:relative;
+  width:86px;
+  height:86px;
+  display:grid;
+  place-items:center;
+  border:1px solid #272a34;
+  border-radius:9px;
+  background:#08090e;
+  overflow:hidden;
+}
+
+.admin-marketplace-card-image img{
+  width:100%;
+  height:100%;
+  object-fit:contain;
+  display:block;
+}
+
+.admin-marketplace-card-image>span:not(.admin-marketplace-status){
+  color:#646877;
+  font-size:25px;
+}
+
+.admin-marketplace-status{
+  position:absolute;
+  top:5px;
+  right:5px;
+  padding:4px 6px;
+  border-radius:6px;
+  font-size:7px;
+  font-weight:900;
+  letter-spacing:.7px;
+}
+
+.admin-marketplace-status.live{
+  border:1px solid #25634c;
+  background:#0f241b;
+  color:#65e1a7;
+}
+
+.admin-marketplace-status.paused{
+  border:1px solid #6a5526;
+  background:#221c0e;
+  color:#e8c66a;
+}
+
+.admin-marketplace-card-body{
+  display:contents;
+}
+
+.admin-marketplace-card-copy{
+  min-width:0;
+}
+
+.admin-marketplace-card-copy h4{
+  margin:0 0 5px;
+  color:#f1eff6;
+  font-size:12px;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+.admin-marketplace-card-copy span{
+  color:#777b88;
+  font-size:9px;
+}
+
+.admin-marketplace-card-stats{
+  display:contents;
+}
+
+.admin-marketplace-card-stats>div{
+  min-width:0;
+  padding:8px 10px;
+  border:1px solid #252832;
+  border-radius:8px;
+  background:#0a0b10;
+  box-sizing:border-box;
+}
+
+.admin-marketplace-card-stats small{
+  display:block;
+  margin-bottom:3px;
+  color:#646876;
+  font-size:7px;
+  font-weight:900;
+  letter-spacing:1px;
+}
+
+.admin-marketplace-card-stats strong{
+  color:#bf9cff;
+  font-size:11px;
+}
+
+.admin-marketplace-card-actions{
+  display:flex;
+  justify-content:flex-end;
+  gap:6px;
+}
+
+.admin-marketplace-card-actions button{
+  min-width:72px;
+  min-height:34px;
+  padding:7px 9px!important;
+  font-size:8px!important;
+}
+
+.admin-marketplace-delete-button{
+  border:1px solid #642d3a!important;
+  background:#241116!important;
+  color:#ff8fa3!important;
+  border-radius:8px!important;
+  cursor:pointer;
+}
+
+.admin-marketplace-delete-button:hover:not(:disabled){
+  border-color:#a84055!important;
+  background:#3a1720!important;
+  color:#fff!important;
+}
+
+.admin-marketplace-empty{
+  min-height:125px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  flex-direction:column;
+  gap:5px;
+  border:1px dashed #2d2f3b;
+  border-radius:12px;
+  background:#0b0c11;
+  color:#767a88;
+  text-align:center;
+}
+
+.admin-marketplace-empty strong{
+  color:#eceaf2;
+  font-size:11px;
+}
+
+.admin-marketplace-empty span{
+  font-size:9px;
+}
+
+/* Edit modal */
+.admin-marketplace-modal-backdrop{
+  position:fixed;
+  inset:0;
+  z-index:3000;
+  display:grid;
+  place-items:center;
+  padding:18px;
+  background:rgba(4,5,9,.78);
+  backdrop-filter:blur(7px);
+}
+
+.admin-marketplace-modal{
+  width:min(820px,100%);
+  max-height:min(780px,calc(100vh - 36px));
+  overflow:auto;
+  padding:18px;
+  border:1px solid #393447;
+  border-radius:16px;
+  background:#101119;
+  box-shadow:0 30px 90px rgba(0,0,0,.65);
+}
+
+.admin-marketplace-modal-head{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:18px;
+  margin-bottom:15px;
+}
+
+.admin-marketplace-modal-head h3{
+  font-size:18px;
+}
+
+.admin-marketplace-close{
+  width:31px;
+  height:31px;
+  border:1px solid #30323e;
+  border-radius:8px;
+  background:#14151c;
+  color:#a0a3ae;
+  font-size:17px;
+  cursor:pointer;
+}
+
+.admin-marketplace-modal-actions{
+  display:flex;
+  justify-content:flex-end;
+  gap:8px;
+  padding-top:13px;
+  border-top:1px solid #292b35;
+  margin-top:15px;
+}
+
+@media(max-width:1050px){
+  .admin-marketplace-card{
+    grid-template-columns:76px minmax(0,1fr) 95px 78px auto;
+    gap:10px;
+  }
+
+  .admin-marketplace-card-image{
+    width:76px;
+    height:76px;
+  }
+}
+
+@media(max-width:900px){
+  .admin-marketplace-header,
+  .admin-marketplace-section-title,
+  .admin-marketplace-list-head{
+    flex-direction:column;
+    align-items:stretch;
+  }
+
+  .admin-marketplace-game-switcher{
+    width:max-content;
+  }
+
+  .admin-marketplace-create-layout,
+  .admin-marketplace-edit-layout{
+    grid-template-columns:1fr;
+  }
+
+  .admin-marketplace-card{
+    grid-template-columns:76px minmax(0,1fr);
+    align-items:start;
+  }
+
+  .admin-marketplace-card-stats{
+    display:grid;
+    grid-column:2;
+    grid-template-columns:1fr 1fr;
+    gap:8px;
+  }
+
+  .admin-marketplace-card-actions{
+    grid-column:2;
+    justify-content:flex-start;
+  }
+}
+
+@media(max-width:620px){
+  .admin-marketplace-game-switcher{
+    width:100%;
+  }
+
+  .admin-marketplace-game-switcher button{
+    flex:1;
+  }
+
+  .admin-marketplace-form-row{
+    grid-template-columns:1fr;
+  }
+
+  .marketplace-image-picker{
+    min-height:190px;
+    flex-direction:column;
+  }
+
+  .admin-marketplace-card-actions{
+    flex-wrap:wrap;
+  }
+
+  .admin-marketplace-card-actions button{
+    flex:1 1 90px;
+  }
+}
+
+/* =========================================================
+   MARKETPLACE IMAGE POLISH
+   ========================================================= */
+.admin-marketplace-card-image{
+  width:88px;
+  height:88px;
+  padding:7px;
+  box-sizing:border-box;
+  background:radial-gradient(circle at 50% 42%,rgba(139,92,246,.10),transparent 58%),#08090e;
+}
+
+.admin-marketplace-card-image img{
+  width:100%;
+  height:100%;
+  max-width:100%;
+  max-height:100%;
+  object-fit:contain;
+  object-position:center;
+  display:block;
+}
+
+.marketplace-image-preview{
+  width:155px;
+  height:155px;
+  padding:8px;
+  box-sizing:border-box;
+  object-fit:contain;
+  object-position:center;
+}
+

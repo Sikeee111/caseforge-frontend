@@ -2,6 +2,9 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
 import Admin from "./admin.jsx";
+import GamePortal from "./GamePortal.jsx";
+import OriginalGames from "./OriginalGames.jsx";
+import "./game-portal.css";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:4000";
 
@@ -10,6 +13,27 @@ const apiFetch = (url, options = {}) =>
     ...options,
     credentials: "include",
   });
+
+const walletFetch = async (url, options = {}, timeoutMs = 25000) => {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await apiFetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      throw new Error(
+        "The deposit service took too long to respond. Please try again."
+      );
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timer);
+  }
+};
 
 const caseMeta = {
   1: { accent: "violet", icon: "🎁", tag: "POPULAR" },
@@ -782,12 +806,146 @@ function JackpotWheel({ players = [], totalCents = 0 }) {
             : "WAITING FOR ENTRIES"}
         </text>
       </svg>
+
+
+      <style>{`
+        /* GAME SIDEBAR — full navigation and matching homepage proportions */
+        .casex-d4-game-sidebar{
+          width:236px !important;
+          left:0 !important;
+          top:74px !important;
+          bottom:0 !important;
+          padding:18px 14px 16px !important;
+          box-sizing:border-box !important;
+          overflow-y:auto !important;
+          overflow-x:hidden !important;
+          display:flex !important;
+          flex-direction:column !important;
+        }
+
+        .casex-d4-game-sidebar.is-collapsed{
+          width:72px !important;
+          padding-left:10px !important;
+          padding-right:10px !important;
+        }
+
+        .casex-d4-game-sidebar-head{
+          min-height:48px !important;
+          padding:6px 8px 18px !important;
+        }
+
+        .casex-d4-game-sidebar-label{
+          margin:10px 8px 7px !important;
+          color:#636676 !important;
+          font-size:8px !important;
+          font-weight:950 !important;
+          letter-spacing:.18em !important;
+        }
+
+        .casex-d4-game-sidebar-promo{
+          margin:12px 3px 12px !important;
+          padding:12px 10px !important;
+          border:1px solid rgba(124,102,167,.2) !important;
+          border-radius:11px !important;
+          background:linear-gradient(145deg,rgba(36,24,61,.75),rgba(14,13,20,.8)) !important;
+          display:flex !important;
+          align-items:flex-start !important;
+          gap:9px !important;
+        }
+
+        .casex-d4-game-promo-icon{
+          width:27px !important;
+          height:27px !important;
+          flex:0 0 27px !important;
+          border-radius:8px !important;
+          display:grid !important;
+          place-items:center !important;
+          background:rgba(128,74,225,.18) !important;
+          color:#b98cff !important;
+          font-size:14px !important;
+        }
+
+        .casex-d4-game-sidebar-promo strong{
+          display:block !important;
+          color:#c39dff !important;
+          font-size:7px !important;
+          letter-spacing:.13em !important;
+        }
+
+        .casex-d4-game-sidebar-promo small{
+          display:block !important;
+          margin-top:4px !important;
+          color:#757888 !important;
+          font-size:7px !important;
+          line-height:1.4 !important;
+        }
+
+        /* The game content starts after the full sidebar instead of sitting under it. */
+        .casex-d4-original-game-stage.sidebar-open .original-games-overlay{
+          left:236px !important;
+          right:0 !important;
+          width:auto !important;
+        }
+
+        .casex-d4-original-game-stage.sidebar-open .original-games-game-tabs{
+          left:256px !important;
+        }
+
+        .casex-d4-original-game-stage.sidebar-collapsed .original-games-overlay{
+          left:72px !important;
+          right:0 !important;
+          width:auto !important;
+        }
+
+        .casex-d4-original-game-stage.sidebar-collapsed .original-games-game-tabs{
+          left:92px !important;
+        }
+
+        @media(max-width:700px){
+          .casex-d4-game-sidebar{
+            top:68px !important;
+            width:184px !important;
+          }
+
+          .casex-d4-game-sidebar.is-collapsed{
+            width:64px !important;
+          }
+
+          .casex-d4-original-game-stage.sidebar-open .original-games-overlay{
+            left:184px !important;
+          }
+
+          .casex-d4-original-game-stage.sidebar-open .original-games-game-tabs{
+            left:204px !important;
+          }
+
+          .casex-d4-original-game-stage.sidebar-collapsed .original-games-overlay{
+            left:64px !important;
+          }
+
+          .casex-d4-original-game-stage.sidebar-collapsed .original-games-game-tabs{
+            left:84px !important;
+          }
+        }
+
+        .casex-d4-game-sidebar.is-collapsed .casex-d4-game-sidebar-promo{
+          width:42px !important;
+          margin-left:auto !important;
+          margin-right:auto !important;
+          padding:6px !important;
+          justify-content:center !important;
+        }
+
+        .casex-d4-game-sidebar.is-collapsed .casex-d4-game-sidebar-promo > div{
+          display:none !important;
+        }
+      `}</style>
     </div>
   );
 }
 
 
-function ColorDicingGame({ authUser, openAuth, onBalanceChange }) {
+function ColorDicingGame({ authUser, balance, openAuth, onBalanceChange }) {
   const colors = [
     { id: "red", name: "Red", hex: "#ef4444" },
     { id: "orange", name: "Orange", hex: "#f97316" },
@@ -811,6 +969,8 @@ function ColorDicingGame({ authUser, openAuth, onBalanceChange }) {
   const [gameStatus, setGameStatus] = useState(null);
   const [loadingGame, setLoadingGame] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
+  const [recentBets, setRecentBets] = useState([]);
+  const [viewingBet, setViewingBet] = useState(null);
   const rollTimerRef = useRef(null);
   const audioContextRef = useRef(null);
   const soundIntervalRef = useRef(null);
@@ -1025,12 +1185,49 @@ function ColorDicingGame({ authUser, openAuth, onBalanceChange }) {
     return serverResponse;
   };
 
+  const rememberCompletedBet = (game) => {
+    if (!game || !["won", "lost"].includes(String(game.status))) {
+      return;
+    }
+
+    const betCents = Number(game.betCents || 0);
+    const payoutCents = Number(game.payoutCents || 0);
+    const multiplier =
+      betCents > 0
+        ? payoutCents / betCents
+        : 0;
+
+    const entry = {
+      gameId: Number(game.gameId || 0),
+      betCents,
+      payoutCents,
+      profitCents: Number(game.profitCents || 0),
+      multiplier,
+      matches: Number(game.matches || 0),
+      status: String(game.status),
+      selectedColor: String(game.selectedColor || selectedColor),
+      dice: Array.isArray(game.dice) ? [...game.dice] : [],
+      rollNumber: Number(game.rollNumber || 1),
+      createdAt: game.createdAt || new Date().toISOString(),
+      completedAt: game.completedAt || new Date().toISOString(),
+    };
+
+    setRecentBets((current) => [
+      entry,
+      ...current.filter(
+        (bet) => Number(bet.gameId) !== Number(entry.gameId)
+      ),
+    ].slice(0, 20));
+  };
+
   const applyGameResponse = (data) => {
     const game = data?.game;
 
     if (!game) {
       throw new Error("COLOR_DICING_GAME_MISSING");
     }
+
+    rememberCompletedBet(game);
 
     if (Array.isArray(game.dice) && game.dice.length === 4) {
       setDice(game.dice);
@@ -1139,11 +1336,14 @@ function ColorDicingGame({ authUser, openAuth, onBalanceChange }) {
 
     const numericBet = Number(betAmount);
 
-    if (!isReroll && (!Number.isFinite(numericBet) || numericBet <= 0)) {
+    if (
+      !isReroll &&
+      (!Number.isFinite(numericBet) || numericBet < 0.10 || numericBet > 100)
+    ) {
       setResult({
         type: "error",
         title: "Invalid bet",
-        message: "Enter a valid bet amount.",
+        message: "Bet must be between $0.10 and $100.00.",
       });
       return;
     }
@@ -1482,37 +1682,79 @@ function ColorDicingGame({ authUser, openAuth, onBalanceChange }) {
             <div className="color-dicing-card">
               <div className="eyebrow">BET AMOUNT</div>
 
-              <div className="color-dicing-input-wrap">
-                <span>$</span>
-                <input
-                  type="number"
-                  min="0.01"
-                  step="0.01"
-                  inputMode="decimal"
-                  value={betAmount}
-                  onChange={(event) => {
-                    if (betLocked) return;
-                    setBetAmount(event.target.value);
-                    setResult(null);
-                    setErrorMessage("");
-                  }}
-                  disabled={rolling || loadingGame || betLocked}
-                />
-              </div>
-
-              <div className="color-dicing-quick-bets">
-                {[1, 5, 10, 25, 50].map((amount) => (
-                  <button
-                    key={amount}
-                    type="button"
-                    onClick={() => {
-                      if (!betLocked) setBetAmount(amount.toFixed(2));
+              <div className="color-dicing-bet-main-row">
+                <div className="color-dicing-input-wrap">
+                  <span>$</span>
+                  <input
+                    type="number"
+                    min="0.10"
+                    max="100"
+                    step="0.01"
+                    inputMode="decimal"
+                    value={betAmount}
+                    onChange={(event) => {
+                      if (betLocked) return;
+                      setBetAmount(event.target.value);
+                      setResult(null);
+                      setErrorMessage("");
                     }}
                     disabled={rolling || loadingGame || betLocked}
+                  />
+                </div>
+
+                <div className="color-dicing-bet-shortcuts">
+                  <button
+                    type="button"
+                    disabled={rolling || loadingGame || betLocked}
+                    onClick={() => {
+                      const cents = Math.round(Number(betAmount) * 100);
+                      if (Number.isFinite(cents) && cents > 0) {
+                        const next = Math.max(10, Math.floor(cents / 2));
+                        setBetAmount((next / 100).toFixed(2));
+                        setResult(null);
+                        setErrorMessage("");
+                      }
+                    }}
                   >
-                    ${amount}
+                    1/2
                   </button>
-                ))}
+
+                  <button
+                    type="button"
+                    disabled={rolling || loadingGame || betLocked}
+                    onClick={() => {
+                      const cents = Math.round(Number(betAmount) * 100);
+                      if (Number.isFinite(cents) && cents > 0) {
+                        const next = Math.min(10000, cents * 2);
+                        setBetAmount((next / 100).toFixed(2));
+                        setResult(null);
+                        setErrorMessage("");
+                      }
+                    }}
+                  >
+                    2X
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={rolling || loadingGame || betLocked}
+                    onClick={() => {
+                      const balanceCents = Math.max(
+                        0,
+                        Math.floor(Number(balance || 0) * 100)
+                      );
+                      const maxCents = Math.min(10000, balanceCents);
+
+                      if (maxCents >= 10) {
+                        setBetAmount((maxCents / 100).toFixed(2));
+                        setResult(null);
+                        setErrorMessage("");
+                      }
+                    }}
+                  >
+                    Max
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -1553,674 +1795,163 @@ function ColorDicingGame({ authUser, openAuth, onBalanceChange }) {
           </aside>
         </div>
       </div>
-    </section>
-  );
-}
 
-function MinesGame({ authUser, openAuth, onBalanceChange, soundEnabled }) {
-  const gridOptions = [3, 5, 7];
-  const mineOptions = {
-    3: Array.from({ length: 8 }, (_, index) => index + 1),
-    5: Array.from({ length: 24 }, (_, index) => index + 1),
-    7: Array.from({ length: 48 }, (_, index) => index + 1),
-  };
-
-  const HOUSE_EDGE = 0.03;
-  const [gridSize, setGridSize] = useState(5);
-  const [mineCount, setMineCount] = useState(3);
-  const [betAmount, setBetAmount] = useState("10.00");
-  const [game, setGame] = useState(null);
-  const [revealingTile, setRevealingTile] = useState(null);
-  const [loadingGame, setLoadingGame] = useState(true);
-  const [actionLoading, setActionLoading] = useState(false);
-  const [recentGames, setRecentGames] = useState([]);
-  const [errorMessage, setErrorMessage] = useState("");
-  const [mineMenuOpen, setMineMenuOpen] = useState(false);
-  const [requestingTile, setRequestingTile] = useState(null);
-
-  const minesAudioRef = useRef(null);
-
-  const getMinesAudio = () => {
-    if (!soundEnabled || typeof window === "undefined") return null;
-
-    const AudioCtx = window.AudioContext || window.webkitAudioContext;
-    if (!AudioCtx) return null;
-
-    if (!minesAudioRef.current) {
-      minesAudioRef.current = new AudioCtx();
-    }
-
-    if (minesAudioRef.current.state === "suspended") {
-      void minesAudioRef.current.resume().catch(() => {});
-    }
-
-    return minesAudioRef.current;
-  };
-
-  const primeMinesAudio = () => {
-    if (!soundEnabled) return;
-    getMinesAudio();
-  };
-
-  const playMineSafeSound = () => {
-    const ctx = getMinesAudio();
-    if (!ctx) return;
-
-    const now = ctx.currentTime;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-
-    osc.type = "sine";
-    osc.frequency.setValueAtTime(520, now);
-    osc.frequency.exponentialRampToValueAtTime(760, now + 0.08);
-
-    gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.exponentialRampToValueAtTime(0.11, now + 0.008);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.13);
-
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start(now);
-    osc.stop(now + 0.14);
-  };
-
-  const playMineExplosionSound = () => {
-    const ctx = getMinesAudio();
-    if (!ctx) return;
-
-    const now = ctx.currentTime;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-
-    osc.type = "sawtooth";
-    osc.frequency.setValueAtTime(145, now);
-    osc.frequency.exponentialRampToValueAtTime(38, now + 0.28);
-
-    gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.exponentialRampToValueAtTime(0.34, now + 0.008);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.3);
-
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start(now);
-    osc.stop(now + 0.32);
-  };
-
-  const playMineCashoutSound = () => {
-    const ctx = getMinesAudio();
-    if (!ctx) return;
-
-    const now = ctx.currentTime;
-    [392, 494, 587].forEach((frequency, index) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      const delay = index * 0.07;
-
-      osc.type = "sine";
-      osc.frequency.setValueAtTime(frequency, now + delay);
-      gain.gain.setValueAtTime(0.0001, now + delay);
-      gain.gain.exponentialRampToValueAtTime(0.095, now + delay + 0.01);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + delay + 0.18);
-
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start(now + delay);
-      osc.stop(now + delay + 0.2);
-    });
-  };
-
-  useEffect(() => {
-    return () => {
-      const context = minesAudioRef.current;
-      if (context && context.state !== "closed") {
-        void context.close();
-      }
-      minesAudioRef.current = null;
-    };
-  }, []);
-
-  const totalTiles = gridSize * gridSize;
-  const safeTiles = Math.max(0, totalTiles - mineCount);
-  const pregameNextSafe = totalTiles > 0 ? safeTiles / totalTiles : 0;
-  const pregameNextMine = Math.max(0, 1 - pregameNextSafe);
-
-  const getPreviewMultiplier = (revealedCount) => {
-    if (revealedCount <= 0) return 1;
-    let survival = 1;
-    for (let i = 0; i < revealedCount; i += 1) {
-      survival *= (safeTiles - i) / (totalTiles - i);
-    }
-    return survival > 0 ? Math.max(1, (1 - HOUSE_EDGE) / survival) : 1;
-  };
-
-  const currentMultiplier = game
-    ? Number(game.currentMultiplier || 1)
-    : 1;
-  const currentBetCents = game
-    ? Number(game.betCents || 0)
-    : Math.round(Number(betAmount || 0) * 100);
-  const potentialWinCents = game
-    ? Number(game.potentialWinCents || 0)
-    : Math.floor(currentBetCents * getPreviewMultiplier(0));
-  const active = game?.status === "active";
-  const finished = game && game.status !== "active";
-  const revealedPositions = new Set(
-    Array.isArray(game?.revealedPositions) ? game.revealedPositions.map(Number) : []
-  );
-  const minePositions = new Set(
-    Array.isArray(game?.minePositions) ? game.minePositions.map(Number) : []
-  );
-
-  const loadRecentGames = async () => {
-    if (!authUser) {
-      setRecentGames([]);
-      return;
-    }
-    try {
-      const response = await apiFetch(`${API}/api/mines/recent`, { cache: "no-store" });
-      const data = await response.json().catch(() => ({}));
-      if (response.ok) setRecentGames(Array.isArray(data.games) ? data.games : []);
-    } catch (error) {
-      console.error("Mines recent-games load failed:", error);
-    }
-  };
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const loadActiveGame = async () => {
-      if (!authUser) {
-        setGame(null);
-        setLoadingGame(false);
-        setErrorMessage("");
-        setRecentGames([]);
-        return;
-      }
-
-      setLoadingGame(true);
-      setErrorMessage("");
-
-      try {
-        const response = await apiFetch(`${API}/api/mines/active`, { cache: "no-store" });
-        const data = await response.json().catch(() => ({}));
-        if (!response.ok) {
-          if (response.status === 401) return;
-          throw new Error(data?.error || "MINES_ACTIVE_GAME_FAILED");
-        }
-
-        if (cancelled) return;
-
-        if (Number.isFinite(Number(data?.balanceCents))) {
-          onBalanceChange?.(Number(data.balanceCents) / 100);
-        }
-
-        if (data?.game) {
-          setGame(data.game);
-          setGridSize(Number(data.game.gridSize));
-          setMineCount(Number(data.game.mineCount));
-          setMineMenuOpen(false);
-          setBetAmount((Number(data.game.betCents) / 100).toFixed(2));
-        } else {
-          setGame(null);
-        }
-      } catch (error) {
-        if (!cancelled) {
-          console.error("Mines active-game load failed:", error);
-          setErrorMessage("Unable to load your Mines game. Please refresh and try again.");
-        }
-      } finally {
-        if (!cancelled) setLoadingGame(false);
-      }
-    };
-
-    void loadActiveGame();
-    void loadRecentGames();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [authUser?.id]);
-
-  useEffect(() => {
-    const allowed = mineOptions[gridSize] || [];
-    if (!allowed.includes(mineCount)) {
-      setMineCount(allowed[0] || 1);
-    }
-  }, [gridSize]);
-
-  const startGame = async () => {
-    if (actionLoading || loadingGame) return;
-    if (!authUser) {
-      openAuth("login");
-      return;
-    }
-
-    const numericBet = Number(betAmount);
-    if (!Number.isFinite(numericBet) || numericBet <= 0) {
-      setErrorMessage("Enter a valid bet amount.");
-      return;
-    }
-
-    setActionLoading(true);
-    setErrorMessage("");
-    primeMinesAudio();
-
-    try {
-      const response = await apiFetch(`${API}/api/mines/start`, {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-  },
-  body: JSON.stringify({
-    gridSize,
-    mineCount,
-    betAmount: numericBet.toFixed(2),
-  }),
-});
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data?.error || "MINES_START_FAILED");
-
-      setGame(data.game);
-      setBetAmount((Number(data.game.betCents) / 100).toFixed(2));
-      if (Number.isFinite(Number(data.newBalanceCents))) {
-        onBalanceChange?.(Number(data.newBalanceCents) / 100);
-      }
-    } catch (error) {
-      console.error("Mines start failed:", error);
-      if (error?.message === "INSUFFICIENT_BALANCE") {
-        setErrorMessage("You don't have enough balance for this bet.");
-      } else if (error?.message === "ACTIVE_GAME_EXISTS") {
-        setErrorMessage("You already have an active Mines game.");
-      } else {
-        setErrorMessage("The Mines game could not be started. Please try again.");
-      }
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const revealTile = async (index) => {
-    if (!active || actionLoading || revealedPositions.has(index)) return;
-
-    setActionLoading(true);
-    setRevealingTile(index);
-    setRequestingTile(index);
-    setErrorMessage("");
-    primeMinesAudio();
-
-    try {
-      const response = await apiFetch(`${API}/api/mines/reveal`, {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-  },
-  body: JSON.stringify({
-    gameId: Number(game.gameId),
-    tileIndex: index,
-  }),
-});
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data?.error || "MINES_REVEAL_FAILED");
-
-      setGame(data.game);
-      if (
-        data.newBalanceCents != null &&
-        Number.isFinite(Number(data.newBalanceCents))
-      ) {
-        onBalanceChange?.(Number(data.newBalanceCents) / 100);
-      }
-
-      if (data.game?.status === "lost") {
-        playMineExplosionSound();
-      } else if (data.game?.status === "active") {
-        playMineSafeSound();
-      } else if (data.game?.status === "cashed_out") {
-        playMineCashoutSound();
-      }
-
-      if (data.game?.status !== "active") {
-        await loadRecentGames();
-      }
-    } catch (error) {
-      console.error("Mines reveal failed:", error);
-      if (error?.message === "TILE_ALREADY_REVEALED") {
-        setErrorMessage("That tile has already been revealed.");
-      } else if (error?.message === "GAME_ALREADY_FINISHED") {
-        setErrorMessage("This Mines game has already finished.");
-      } else {
-        setErrorMessage("The tile could not be revealed. Please try again.");
-      }
-    } finally {
-      setRevealingTile(null);
-      setRequestingTile(null);
-      setActionLoading(false);
-    }
-  };
-
-  const cashOut = async () => {
-    if (!active || actionLoading || revealedPositions.size === 0) return;
-
-    setActionLoading(true);
-    setErrorMessage("");
-    primeMinesAudio();
-
-    try {
-      const response = await apiFetch(`${API}/api/mines/cashout`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ gameId: Number(game.gameId) }),
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data?.error || "MINES_CASHOUT_FAILED");
-
-      setGame(data.game);
-      if (
-        data.newBalanceCents != null &&
-        Number.isFinite(Number(data.newBalanceCents))
-      ) {
-        onBalanceChange?.(Number(data.newBalanceCents) / 100);
-      }
-      playMineCashoutSound();
-      await loadRecentGames();
-    } catch (error) {
-      console.error("Mines cashout failed:", error);
-      if (error?.message === "NO_TILES_REVEALED") {
-        setErrorMessage("Reveal at least one safe tile before cashing out.");
-      } else {
-        setErrorMessage("Cash out failed. Please try again.");
-      }
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const newGame = () => {
-    setGame(null);
-    setMineMenuOpen(false);
-    setErrorMessage("");
-    setRevealingTile(null);
-  };
-
-  const quickBet = (amount) => {
-    if (!active) setBetAmount(amount.toFixed(2));
-  };
-
-  const nextSafeProbability = game
-    ? Number(game.nextSafeProbability || 0)
-    : pregameNextSafe;
-  const nextMineProbability = game
-    ? Number(game.nextMineProbability || 0)
-    : pregameNextMine;
-
-  return (
-    <section className="mines-page">
-      <div className="mines-shell">
-        <div className="mines-header">
-          <div>
-            <div className="eyebrow">CASEX ORIGINAL</div>
-            <h1>Mines</h1>
-            <p>Uncover tiles, avoid the mines. The further you go, the higher the reward.</p>
-          </div>
-          <div className="mines-live"><span></span>LIVE</div>
+      <section className="casex-color-dicing-my-bets" aria-label="Color Dicing bet history">
+        <div className="casex-color-dicing-my-bets-head">
+          <div className="casex-color-dicing-my-bets-tab active">My Bets</div>
+          <span>YOUR COLOR DICING</span>
         </div>
 
-        <div className="mines-layout">
-          <aside className="mines-controls-card">
-            <div className="mines-control-block">
-              <div className="eyebrow">GRID SIZE</div>
-              <div className="mines-grid-options">
-                {gridOptions.map((size) => (
-                  <button
-                    key={size}
-                    type="button"
-                    className={gridSize === size ? "active" : ""}
-                    onClick={() => {
-                      if (!active && !actionLoading) {
-                        setGridSize(size);
-                        setMineMenuOpen(false);
-                        setErrorMessage("");
-                      }
-                    }}
-                    disabled={active || actionLoading}
-                  >
-                    {size} × {size}
-                  </button>
-                ))}
+        <div className="casex-color-dicing-my-bets-table-wrap">
+          {recentBets.length ? (
+            <div className="casex-color-dicing-my-bets-table">
+              <div className="casex-color-dicing-my-bets-row casex-color-dicing-my-bets-head-row">
+                <span>GAME</span>
+                <span>BET AMOUNT</span>
+                <span>MULTIPLIER</span>
+                <span>PAYOUT</span>
+                <span>RESULT</span>
               </div>
-            </div>
 
-            <div className="mines-control-block">
-              <div className="eyebrow">MINES</div>
-              <div className="mines-select-wrap">
-                <button
-                  type="button"
-                  className={`mines-select ${mineMenuOpen ? "open" : ""}`}
-                  onClick={() => {
-                    if (!active && !actionLoading) setMineMenuOpen((open) => !open);
-                  }}
-                  disabled={active || actionLoading}
-                  aria-haspopup="listbox"
-                  aria-expanded={mineMenuOpen}
+              {recentBets.map((betEntry) => (
+                <div
+                  className="casex-color-dicing-my-bets-row"
+                  key={`${betEntry.gameId}-${betEntry.completedAt}`}
                 >
-                  <span>{mineCount}</span>
-                  <span className="mines-select-arrow">⌄</span>
-                </button>
+                  <span className="casex-color-dicing-my-bets-game">
+                    <b>🎲</b>
+                    Color Dicing
+                  </span>
 
-                {mineMenuOpen && !active && !actionLoading && (
-                  <div className="mines-options-menu" role="listbox" aria-label="Mine count">
-                    {(mineOptions[gridSize] || []).map((count) => (
-                      <button
-                        key={count}
-                        type="button"
-                        role="option"
-                        aria-selected={mineCount === count}
-                        className={`mines-option ${mineCount === count ? "active" : ""}`}
-                        onClick={() => {
-                          setMineCount(count);
-                          setMineMenuOpen(false);
-                          setErrorMessage("");
-                        }}
-                      >
-                        {count}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="mines-control-block">
-              <div className="eyebrow">BET AMOUNT</div>
-              <div className="mines-input-wrap">
-                <span>$</span>
-                <input
-                  type="number"
-                  min="0.01"
-                  step="0.01"
-                  value={active ? (Number(currentBetCents) / 100).toFixed(2) : betAmount}
-                  onChange={(event) => {
-                    if (!active && !actionLoading) setBetAmount(event.target.value);
-                  }}
-                  disabled={active || actionLoading}
-                />
-              </div>
-
-              <div className="mines-quick-bets">
-                {[1, 5, 10, 25, 50].map((amount) => (
-                  <button
-                    key={amount}
-                    type="button"
-                    onClick={() => quickBet(amount)}
-                    disabled={active || actionLoading}
-                  >
-                    ${amount}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="mines-odds-box">
-              <div>
-                <span>Next tile safe</span>
-                <strong>{(nextSafeProbability * 100).toFixed(2)}%</strong>
-              </div>
-              <div>
-                <span>Mine chance</span>
-                <strong>{(nextMineProbability * 100).toFixed(2)}%</strong>
-              </div>
-            </div>
-
-            {!active && !finished ? (
-              <button
-                type="button"
-                className="mines-start-button"
-                onClick={startGame}
-                disabled={loadingGame || actionLoading}
-              >
-                {loadingGame ? "LOADING..." : actionLoading ? "STARTING..." : "START GAME"}
-              </button>
-            ) : active ? (
-              <button
-                type="button"
-                className="mines-start-button mines-cashout-button"
-                onClick={cashOut}
-                disabled={actionLoading || revealedPositions.size === 0}
-              >
-                {actionLoading ? "PROCESSING..." : revealedPositions.size === 0 ? "REVEAL A TILE" : `CASH OUT $${(potentialWinCents / 100).toFixed(2)}`}
-              </button>
-            ) : (
-              <button
-                type="button"
-                className="mines-start-button"
-                onClick={newGame}
-                disabled={actionLoading}
-              >
-                NEW GAME
-              </button>
-            )}
-
-            {errorMessage && (
-              <div className="mines-error">{errorMessage}</div>
-            )}
-          </aside>
-
-          <div className="mines-main-column">
-            <div className={`mines-board mines-board-${gridSize} ${active ? "is-active" : ""} ${finished ? "is-finished" : ""}`}>
-              {Array.from({ length: totalTiles }, (_, index) => {
-                const isRevealed = revealedPositions.has(index);
-                const isMine = minePositions.has(index);
-                const showFinishedBoard = Boolean(finished);
-                const isShown = isRevealed || showFinishedBoard;
-                const disabled =
-                  loadingGame ||
-                  actionLoading ||
-                  (!active && !finished) ||
-                  isRevealed ||
-                  finished;
-
-                return (
-                  <button
-                    key={index}
-                    type="button"
-                    className={`mines-tile ${isShown && !isMine ? "revealed" : ""} ${isMine && showFinishedBoard ? "mine" : ""} ${revealingTile === index ? "is-revealing" : ""} ${requestingTile === index ? "is-pending" : ""}`}
-                    onPointerDown={() => {
-                      if (active && !actionLoading && !revealedPositions.has(index)) {
-                        primeMinesAudio();
-                        setRequestingTile(index);
-                      }
-                    }}
-                    onClick={() => revealTile(index)}
-                    disabled={disabled}
-                    aria-label={isMine && showFinishedBoard ? "Mine" : isShown ? "Safe tile" : "Hidden tile"}
-                  >
-                    {isMine && showFinishedBoard ? "✕" : isShown ? "◆" : requestingTile === index ? "…" : "?"}
-                  </button>
-                );
-              })}
-
-              {game?.status === "cashed_out" && (
-                <div className="mines-result-overlay" aria-live="polite">
-                  <strong>{currentMultiplier.toFixed(2)}×</strong>
                   <span>
-                    ${(Number(game.payoutCents || 0) / 100).toFixed(2)}
+                    ${(Number(betEntry.betCents || 0) / 100).toFixed(2)}
+                  </span>
+
+                  <span
+                    className={`casex-color-dicing-my-bets-multiplier ${
+                      Number(betEntry.payoutCents || 0) > 0 ? "win" : "loss"
+                    }`}
+                  >
+                    {Number(betEntry.multiplier || 0).toFixed(2)}×
+                  </span>
+
+                  <span
+                    className={`casex-color-dicing-my-bets-payout ${
+                      Number(betEntry.payoutCents || 0) > 0 ? "win" : ""
+                    }`}
+                  >
+                    ${(Number(betEntry.payoutCents || 0) / 100).toFixed(2)}
+                  </span>
+
+                  <span>
+                    <button
+                      type="button"
+                      className="casex-color-dicing-view-result"
+                      onClick={() => setViewingBet(betEntry)}
+                    >
+                      View Result
+                    </button>
                   </span>
                 </div>
-              )}
-            </div>
-
-            <div className="mines-stats-bar">
-              <div>
-                <span>Tiles Left</span>
-                <strong>{game ? Number(game.tilesLeft || 0) : safeTiles}</strong>
-              </div>
-              <div>
-                <span>Current Multiplier</span>
-                <strong>{currentMultiplier.toFixed(2)}x</strong>
-              </div>
-              <div>
-                <span>Potential Win</span>
-                <strong>${(potentialWinCents / 100).toFixed(2)}</strong>
-              </div>
-            </div>
-            <div className="mines-odds-note">
-              Next tile: <strong>{(nextSafeProbability * 100).toFixed(2)}% safe</strong> · <strong>{(nextMineProbability * 100).toFixed(2)}% mine</strong>
-            </div>
-          </div>
-        </div>
-
-        <div className="mines-recent-card">
-          <div className="mines-card-heading">
-            <div>
-              <div className="eyebrow">RECENT GAMES</div>
-              <h2>Mines Activity</h2>
-            </div>
-            <span className="mines-card-muted">Your latest rounds will appear here.</span>
-          </div>
-
-          {recentGames.length ? (
-            <div className="mines-recent-table-wrap">
-              <table className="mines-recent-table">
-                <thead>
-                  <tr>
-                    <th>Grid</th>
-                    <th>Mines</th>
-                    <th>Tiles</th>
-                    <th>Multiplier</th>
-                    <th>Win</th>
-                    <th>Result</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {recentGames.map((entry) => (
-                    <tr key={entry.gameId}>
-                      <td>{entry.gridSize} × {entry.gridSize}</td>
-                      <td>{entry.mineCount}</td>
-                      <td>{entry.revealedCount}</td>
-                      <td className="mines-history-multiplier">{Number(entry.multiplier || 0).toFixed(2)}x</td>
-                      <td>${(Number(entry.payoutCents || 0) / 100).toFixed(2)}</td>
-                      <td className={entry.status === "lost" ? "mines-history-loss" : "mines-history-win"}>
-                        {entry.status === "lost" ? "Hit Mine" : "Cashed Out"}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              ))}
             </div>
           ) : (
-            <div className="mines-recent-empty">
-              <span>◆</span>
-              <strong>No Mines games yet</strong>
-              <small>Start a game to build your recent activity history.</small>
+            <div className="casex-color-dicing-my-bets-empty">
+              Your completed Color Dicing bets will appear here.
             </div>
           )}
         </div>
-      </div>
+      </section>
+
+      {viewingBet && (
+        <div
+          className="casex-color-dicing-result-modal-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Color Dicing bet result"
+          onClick={() => setViewingBet(null)}
+        >
+          <div
+            className="casex-color-dicing-result-modal"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="casex-color-dicing-result-modal-head">
+              <div>
+                <div className="eyebrow">BET RESULT</div>
+                <h2>
+                  {viewingBet.status === "won" ? "Color Match" : "No Match"}
+                </h2>
+              </div>
+
+              <button
+                type="button"
+                className="casex-color-dicing-result-modal-close"
+                onClick={() => setViewingBet(null)}
+                aria-label="Close result"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="casex-color-dicing-result-meta">
+              <div>
+                <span>Selected Color</span>
+                <strong>{colorById(viewingBet.selectedColor).name}</strong>
+              </div>
+              <div>
+                <span>Matches</span>
+                <strong>{viewingBet.matches}/4</strong>
+              </div>
+              <div>
+                <span>Bet</span>
+                <strong>${(Number(viewingBet.betCents || 0) / 100).toFixed(2)}</strong>
+              </div>
+              <div>
+                <span>Payout</span>
+                <strong className={Number(viewingBet.payoutCents || 0) > 0 ? "win" : "loss"}>
+                  ${(Number(viewingBet.payoutCents || 0) / 100).toFixed(2)}
+                </strong>
+              </div>
+            </div>
+
+            <div className="casex-color-dicing-result-dice">
+              {Array.isArray(viewingBet.dice) && viewingBet.dice.length
+                ? viewingBet.dice.map((colorId, index) => {
+                    const dieColor = colorById(colorId);
+                    return (
+                      <div
+                        key={`${colorId}-${index}`}
+                        className="casex-color-dicing-result-die"
+                        style={{ "--result-die-color": dieColor.hex }}
+                      >
+                        <span></span>
+                        <small>{dieColor.name}</small>
+                      </div>
+                    );
+                  })
+                : null}
+            </div>
+
+            <div
+              className={`casex-color-dicing-result-status ${
+                Number(viewingBet.payoutCents || 0) > 0 ? "win" : "loss"
+              }`}
+            >
+              <strong>
+                {Number(viewingBet.payoutCents || 0) > 0 ? "WON" : "LOST"}
+              </strong>
+              <span>
+                {Number(viewingBet.payoutCents || 0) > 0
+                  ? `${Number(viewingBet.multiplier || 0).toFixed(2)}× payout`
+                  : "No payout"}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
-
 
 function App() {
   useScrollReveal();
@@ -2232,6 +1963,8 @@ function App() {
   const [recentWins, setRecentWins] = useState([]);
   const [liveActivity, setLiveActivity] = useState([]);
   const [liveActivityLoading, setLiveActivityLoading] = useState(true);
+  const [homeTrendingItems, setHomeTrendingItems] = useState([]);
+  const [homeTrendingLoading, setHomeTrendingLoading] = useState(true);
 
   const [jackpotData, setJackpotData] = useState(null);
   const [jackpotLoading, setJackpotLoading] = useState(true);
@@ -2522,8 +2255,31 @@ function App() {
   const [selected, setSelected] = useState(null);
   const [casesPageOpen, setCasesPageOpen] = useState(false);
   const [colorDicingOpen, setColorDicingOpen] = useState(false);
-  const [minesOpen, setMinesOpen] = useState(false);
+  const [gamePortalOpen, setGamePortalOpen] = useState(false);
+  const [gameMenuOpen, setGameMenuOpen] = useState(false);
+  const [d4SidebarOpen, setD4SidebarOpen] = useState(true);
+  const [d4SidebarSection, setD4SidebarSection] = useState("home");
+
+  // Keep the global sidebar state available to every full-screen surface,
+  // including Game Portal and Original Games, even when the homepage <main>
+  // is hidden.
+  useEffect(() => {
+    document.body.classList.toggle("casex-global-sidebar-open", d4SidebarOpen);
+    document.body.classList.toggle("casex-global-sidebar-closed", !d4SidebarOpen);
+
+    return () => {
+      document.body.classList.remove("casex-global-sidebar-open");
+      document.body.classList.remove("casex-global-sidebar-closed");
+    };
+  }, [d4SidebarOpen]);
+  const [originalsMenuOpen, setOriginalsMenuOpen] = useState(false);
+  const [originalGameOpen, setOriginalGameOpen] = useState(null);
+  const [jackpotPageOpen, setJackpotPageOpen] = useState(false);
+  const [gamePortalGame, setGamePortalGame] = useState(null);
+  const [gamePortalTab, setGamePortalTab] = useState("marketplace");
+  const gamePortalReturnGameRef = useRef(null);
   const [casesSearch, setCasesSearch] = useState("");
+  const [casesGameFilter, setCasesGameFilter] = useState("all");
   const [casesTagFilter, setCasesTagFilter] = useState("All");
   const [casesSort, setCasesSort] = useState("featured");
   const [opening, setOpening] = useState(false);
@@ -2603,6 +2359,8 @@ const [authForm, setAuthForm] = useState({
   const reelTrackRef = useRef(null);
   const reelWindowRef = useRef(null);
   const profileRef = useRef(null);
+  const gameMenuRef = useRef(null);
+  const originalsMenuRef = useRef(null);
 
   // Case-opening sound engine. Sounds are generated with Web Audio so no
   // external audio files are required and browser autoplay rules are easier
@@ -2643,8 +2401,10 @@ const [authForm, setAuthForm] = useState({
       setDepositMinimumLoading(true);
 
       try {
-        const response = await apiFetch(
-          `${API}/api/payments/nowpayments/minimums`
+        const response = await walletFetch(
+          `${API}/api/payments/nowpayments/minimums`,
+          {},
+          20000
         );
 
         const data = await response.json();
@@ -3183,6 +2943,41 @@ const [authForm, setAuthForm] = useState({
     }
   };
 
+  const loadHomeTrending = async () => {
+    try {
+      setHomeTrendingLoading(true);
+      const response = await apiFetch(`${API}/api/marketplace?game=steal-a-brainrot`, {
+        cache: "no-store",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to load marketplace highlights");
+      }
+
+      const data = await response.json();
+      const listings = Array.isArray(data.listings) ? data.listings : [];
+      const unique = [];
+      const seenNames = new Set();
+
+      [...listings]
+        .filter((item) => Number(item.stock ?? 0) > 0)
+        .sort((a, b) => Number(b.priceCents || 0) - Number(a.priceCents || 0))
+        .forEach((item) => {
+          const name = String(item.name || "").trim().toLowerCase();
+          if (!name || seenNames.has(name) || unique.length >= 4) return;
+          seenNames.add(name);
+          unique.push(item);
+        });
+
+      setHomeTrendingItems(unique);
+    } catch (error) {
+      console.error("Homepage marketplace highlights failed:", error);
+      setHomeTrendingItems([]);
+    } finally {
+      setHomeTrendingLoading(false);
+    }
+  };
+
   const loadCases = async () => {
     const response = await apiFetch(`${API}/api/cases`);
 
@@ -3222,6 +3017,7 @@ const [authForm, setAuthForm] = useState({
     );
 
     loadLiveActivity();
+    loadHomeTrending();
 
     apiFetch(`${API}/api/auth/me`)
       .then(async (response) => {
@@ -3306,6 +3102,26 @@ const [authForm, setAuthForm] = useState({
         "mousedown",
         handleProfileOutsideClick
       );
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleGameMenuOutsideClick = (event) => {
+      const insideGames =
+        gameMenuRef.current &&
+        gameMenuRef.current.contains(event.target);
+      const insideOriginals =
+        originalsMenuRef.current &&
+        originalsMenuRef.current.contains(event.target);
+
+      if (!insideGames) setGameMenuOpen(false);
+      if (!insideOriginals) setOriginalsMenuOpen(false);
+    };
+
+    document.addEventListener("mousedown", handleGameMenuOutsideClick);
+
+    return () => {
+      document.removeEventListener("mousedown", handleGameMenuOutsideClick);
     };
   }, []);
 
@@ -3818,7 +3634,8 @@ const openAuth = (mode = "login") => {
     const filtered = decoratedCases.filter((item) => {
       const matchesQuery = !query || [item.name, item.description, item.tag].some((value) => String(value || "").toLowerCase().includes(query));
       const matchesTag = casesTagFilter === "All" || String(item.tag || "") === casesTagFilter;
-      return matchesQuery && matchesTag;
+      const matchesGame = casesGameFilter === "all" || String(item.game_slug || "steal-a-brainrot") === casesGameFilter;
+      return matchesQuery && matchesTag && matchesGame;
     });
     return [...filtered].sort((a, b) => {
       if (casesSort === "price-low") return Number(a.price || 0) - Number(b.price || 0);
@@ -3828,7 +3645,7 @@ const openAuth = (mode = "login") => {
       const bf = b.featured === true || b.featured === 1 || b.featured === "true" ? 0 : 1;
       return af - bf || Number(a.featured_order || 999999) - Number(b.featured_order || 999999) || Number(a.id || 0) - Number(b.id || 0);
     });
-  }, [decoratedCases, casesSearch, casesTagFilter, casesSort]);
+  }, [decoratedCases, casesSearch, casesTagFilter, casesGameFilter, casesSort]);
 
   const featuredCases = useMemo(
     () =>
@@ -4255,7 +4072,60 @@ const openAuth = (mode = "login") => {
     };
   }, []);
 
-const handleWalletAction = async () => {
+const switchDepositCurrency = async (nextCurrency) => {
+    if (
+      !nextCurrency ||
+      nextCurrency === depositCurrency ||
+      walletLoading
+    ) {
+      return;
+    }
+
+    setWalletLoading(true);
+
+    try {
+      const response = await walletFetch(
+        `${API}/api/me/wallet/deposit-address?payCurrency=${encodeURIComponent(
+          nextCurrency
+        )}`,
+        {},
+        25000
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message ||
+            data.error ||
+            "Failed to load the deposit address."
+        );
+      }
+
+      if (!data.payAddress) {
+        throw new Error("No deposit address was returned.");
+      }
+
+      setDepositCurrency(nextCurrency);
+
+      setCryptoPayment({
+        paymentId: data.providerPaymentId || null,
+        requestId: data.requestId || data.request?.id || null,
+        payAddress: data.payAddress,
+        payCurrency: data.payCurrency || nextCurrency,
+        network: data.network,
+        minimumUsd: data.minimumUsd,
+        status: "waiting",
+      });
+    } catch (error) {
+      console.error("Deposit currency switch failed:", error);
+      alert(error.message);
+    } finally {
+      setWalletLoading(false);
+    }
+  };
+
+  const handleWalletAction = async () => {
     const amount =
       walletAction === "withdraw"
         ? Number(walletAmount)
@@ -4279,12 +4149,14 @@ const handleWalletAction = async () => {
     try {
 const response =
   walletAction === "deposit"
-    ? await apiFetch(
+    ? await walletFetch(
         `${API}/api/me/wallet/deposit-address?payCurrency=${encodeURIComponent(
           depositCurrency
-        )}`
+        )}`,
+        {},
+        25000
       )
-    : await apiFetch(
+    : await walletFetch(
         `${API}/api/me/wallet/withdraw`,
         {
           method: "POST",
@@ -4955,40 +4827,262 @@ useEffect(() => {
     }
   };
 
+  const openJackpotPage = () => {
+    setOriginalGameOpen(null);
+    if (opening) return;
+
+    setGameMenuOpen(false);
+    setOriginalsMenuOpen(false);
+    setProfileOpen(false);
+    setColorDicingOpen(false);
+    setCasesPageOpen(false);
+    setGamePortalOpen(false);
+    setGamePortalGame(null);
+    setGamePortalTab("marketplace");
+    setSelected(null);
+    setResult(null);
+    setWonInventoryId(null);
+    setReelItems([]);
+    setReelWinningReward(null);
+    setReelTarget(null);
+    setReelAnimating(false);
+    setJackpotPageOpen(true);
+
+    requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    });
+  };
+
+  const closeJackpotPage = () => {
+    if (opening || jackpotEntryLoading) return;
+
+    setJackpotPageOpen(false);
+    setJackpotEntryOpen(false);
+    setJackpotEntryError("");
+    setJackpotAmount("");
+    setJackpotSelectedInventoryIds(new Set());
+
+    requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    });
+  };
+
   const openColorDicing = () => {
     if (opening) return;
-    setMinesOpen(false);
+    setOriginalGameOpen("dicing");
+    setGameMenuOpen(false);
+    setOriginalsMenuOpen(false);
+    setJackpotPageOpen(false);
+    setGamePortalOpen(false);
+    setGamePortalGame(null);
+    setGamePortalTab("marketplace");
     if (selected) closeCasePage();
     if (casesPageOpen) closeCasesPage();
     setProfileOpen(false);
-    setColorDicingOpen(true);
+    setColorDicingOpen(false);
     requestAnimationFrame(() => {
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
     });
   };
 
   const closeColorDicing = () => {
     setColorDicingOpen(false);
+    setOriginalGameOpen(null);
   };
 
   const openMines = () => {
+    openOriginalGame("mines");
+  };
+
+  const runSmoothPageTransition = (update) => {
+    if (
+      typeof document !== "undefined" &&
+      typeof document.startViewTransition === "function"
+    ) {
+      document.startViewTransition(() => {
+        update();
+      });
+      return;
+    }
+
+    update();
+  };
+
+  const openOriginalGame = (gameSlug = "towers") => {
     if (opening) return;
-    if (selected) closeCasePage();
-    if (casesPageOpen) closeCasesPage();
+
+    setOriginalGameOpen(gameSlug);
+    setGameMenuOpen(false);
+    setOriginalsMenuOpen(false);
+    setJackpotPageOpen(false);
     setProfileOpen(false);
     setColorDicingOpen(false);
-    setMinesOpen(true);
+    setGamePortalOpen(false);
+    setGamePortalGame(null);
+    setGamePortalTab("marketplace");
+    setCasesPageOpen(false);
+    setSelected(null);
+    setResult(null);
+
     requestAnimationFrame(() => {
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      window.scrollTo({ top: 0, left: 0, behavior: "smooth" });
     });
   };
 
-  const closeMines = () => {
-    setMinesOpen(false);
+  const closeOriginalGame = () => {
+    if (opening) return;
+    setOriginalGameOpen(null);
+  };
+
+  const openGamePortal = (gameSlug = null, tab = "marketplace") => {
+    setOriginalGameOpen(null);
+    if (opening) return;
+    setGameMenuOpen(false);
+    setOriginalsMenuOpen(false);
+    setJackpotPageOpen(false);
+    setProfileOpen(false);
+    setColorDicingOpen(false);
+    setCasesPageOpen(false);
+    setSelected(null);
+    setResult(null);
+    setGamePortalGame(gameSlug);
+    setGamePortalTab(tab);
+    setGamePortalOpen(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const closeGamePortal = () => {
+    if (opening) return;
+    setGamePortalOpen(false);
+    setGamePortalGame(null);
+    setGamePortalTab("marketplace");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const closeAllOverlaysForNavigation = () => {
+    setOriginalGameOpen(null);
+    if (opening) return false;
+    stopReelSound();
+    setJackpotPageOpen(false);
+    setGameMenuOpen(false);
+    setOriginalsMenuOpen(false);
+    setGamePortalOpen(false);
+    setGamePortalGame(null);
+    setGamePortalTab("marketplace");
+    setColorDicingOpen(false);
+    setCasesPageOpen(false);
+    setSelected(null);
+    setResult(null);
+    setWonInventoryId(null);
+    setReelItems([]);
+    setReelWinningReward(null);
+    setReelTarget(null);
+    setReelAnimating(false);
+    return true;
+  };
+
+  const openCaseFromGamePortal = async (gameCase) => {
+    if (opening || !gameCase?.id) return;
+
+    gamePortalReturnGameRef.current =
+      gamePortalGame ||
+      gameCase.game_slug ||
+      "steal-a-brainrot";
+
+    setResult(null);
+    setWonInventoryId(null);
+    setReelItems([]);
+    setReelWinningReward(null);
+    setReelTarget(null);
+    setReelAnimating(false);
+
+    try {
+      const response = await apiFetch(`${API}/api/cases/${gameCase.id}`, {
+        cache: "no-store",
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data?.error || "Failed to load case"
+        );
+      }
+
+      const rewards = Array.isArray(data.items)
+        ? data.items.map((item) => ({
+            ...item,
+            id: Number(item.id),
+            value_cents: Number(
+              item.value_cents ?? item.valueCents ?? 0
+            ),
+            valueCents: Number(
+              item.value_cents ?? item.valueCents ?? 0
+            ),
+            image_url:
+              item.image_url ??
+              item.imageUrl ??
+              "",
+            imageUrl:
+              item.image_url ??
+              item.imageUrl ??
+              "",
+          }))
+        : [];
+
+      const normalizedCase = {
+        ...gameCase,
+        ...(data.case || {}),
+        price:
+          Number(
+            data.case?.price_cents ??
+              gameCase.price_cents ??
+              0
+          ) / 100,
+        price_cents: Number(
+          data.case?.price_cents ??
+            gameCase.price_cents ??
+            0
+        ),
+        image_url:
+          data.case?.image_url ??
+          gameCase.image_url ??
+          gameCase.imageUrl ??
+          "",
+        items: rewards,
+      };
+
+      /*
+       * The browser View Transition API captures the old portal UI,
+       * applies both state changes in one update, and then crossfades
+       * directly into the existing CaseX case page.
+       */
+      runSmoothPageTransition(() => {
+        setSelected(normalizedCase);
+        setGamePortalOpen(false);
+        setGamePortalGame(null);
+        setGamePortalTab("marketplace");
+
+        window.scrollTo({
+          top: 0,
+          left: 0,
+          behavior: "auto",
+        });
+      });
+    } catch (error) {
+      console.error(
+        "Game portal case preview failed:",
+        error
+      );
+      alert(
+        error?.message ||
+          "Failed to load this case."
+      );
+    }
   };
 
   const openCasesPage = () => {
     setColorDicingOpen(false);
+    setJackpotPageOpen(false);
     if (opening) return;
     setSelected(null);
     setResult(null);
@@ -5018,12 +5112,31 @@ useEffect(() => {
     if (opening) return;
 
     stopReelSound();
-    setSelected(null);
-    setResult(null);
-    setWonInventoryId(null);
-    setReelItems([]);
-    setReelWinningReward(null);
-    setReelTarget(null);
+
+    const returnGame = gamePortalReturnGameRef.current;
+
+    runSmoothPageTransition(() => {
+      setSelected(null);
+      setResult(null);
+      setWonInventoryId(null);
+      setReelItems([]);
+      setReelWinningReward(null);
+      setReelTarget(null);
+      setReelAnimating(false);
+
+      if (returnGame) {
+        setGamePortalGame(returnGame);
+        setGamePortalTab("cases");
+        setGamePortalOpen(true);
+        gamePortalReturnGameRef.current = null;
+      }
+
+      window.scrollTo({
+        top: 0,
+        left: 0,
+        behavior: "auto",
+      });
+    });
   };
 
   const activeItems = selected?.items || [];
@@ -5410,6 +5523,69 @@ useEffect(() => {
 
   return (
     <div className="app">
+      <style>{`
+        /* CASEX WALLET — exact centering for Deposit / Withdraw / History */
+        .wallet-modal-backdrop .wallet-tabs.wallet-tabs-premium{
+          display:grid !important;
+          grid-template-columns:repeat(3,minmax(0,1fr)) !important;
+          align-items:stretch !important;
+          width:100% !important;
+        }
+
+        .wallet-modal-backdrop .wallet-tabs.wallet-tabs-premium button{
+          position:relative !important;
+          width:100% !important;
+          min-width:0 !important;
+          min-height:56px !important;
+          height:56px !important;
+          margin:0 !important;
+          padding:0 10px !important;
+          display:grid !important;
+          place-items:center !important;
+          align-content:center !important;
+          justify-items:center !important;
+          text-align:center !important;
+        }
+
+        .wallet-modal-backdrop .wallet-tabs.wallet-tabs-premium button > span{
+          display:block !important;
+          width:100% !important;
+          margin:0 !important;
+          padding:0 !important;
+          line-height:1 !important;
+          text-align:center !important;
+          font-size:12px !important;
+          font-weight:850 !important;
+        }
+
+        .wallet-modal-backdrop .wallet-tabs.wallet-tabs-premium button > small{
+          display:none !important;
+        }
+
+        .wallet-modal-backdrop .wallet-premium-header-compact{
+          min-height:28px !important;
+          align-items:center !important;
+          margin-bottom:14px !important;
+        }
+
+        .wallet-modal-backdrop .wallet-premium-header-compact .eyebrow{
+          margin:0 !important;
+        }
+
+        /* Remove the inner outline around the generated deposit selector. */
+        .wallet-modal-backdrop .casex-clean-select-live{
+          outline:0 !important;
+        }
+
+        .wallet-modal-backdrop .casex-clean-select-live select,
+        .wallet-modal-backdrop .casex-clean-select-live select:focus,
+        .wallet-modal-backdrop .casex-clean-select-live select:focus-visible{
+          border:0 !important;
+          outline:0 !important;
+          box-shadow:none !important;
+          background:transparent !important;
+        }
+      `}</style>
 
         <style>{`
           .color-dicing-page-wrap{
@@ -5789,6 +5965,9 @@ useEffect(() => {
             flex-direction:column;
             gap:18px;
           }
+          .color-dicing-bet-main-row{
+            grid-template-columns:minmax(0,1fr) 126px;
+          }
           .color-dicing-card{
             padding:20px;
             border:1px solid rgba(255,255,255,.07);
@@ -5855,25 +6034,53 @@ useEffect(() => {
             color:#fff;
             font:800 14px/1 inherit;
           }
-          .color-dicing-quick-bets{
+          .color-dicing-bet-main-row{
             display:grid;
-            grid-template-columns:repeat(5,1fr);
-            gap:5px;
-            margin-top:8px;
+            grid-template-columns:minmax(0,1fr) 132px;
+            gap:6px;
+            margin-top:13px;
+            align-items:stretch;
           }
-          .color-dicing-quick-bets button{
-            min-height:31px;
-            border:1px solid rgba(255,255,255,.07);
-            border-radius:7px;
+          .color-dicing-bet-main-row .color-dicing-input-wrap{
+            margin-top:0;
+          }
+          .color-dicing-bet-shortcuts{
+            display:grid;
+            grid-template-columns:repeat(3,1fr);
+            min-width:0;
+            height:46px;
+            border:1px solid rgba(255,255,255,.09);
+            border-radius:10px;
+            overflow:hidden;
             background:rgba(255,255,255,.025);
+          }
+          .color-dicing-bet-shortcuts button{
+            min-width:0;
+            height:100%;
+            padding:0;
+            border:0;
+            border-right:1px solid rgba(255,255,255,.07);
+            background:transparent;
             color:#8f899b;
             font-size:9px;
-            font-weight:800;
+            font-weight:850;
+            line-height:1;
+            text-align:center;
+            display:flex;
+            align-items:center;
+            justify-content:center;
             cursor:pointer;
           }
-          .color-dicing-quick-bets button:hover{
+          .color-dicing-bet-shortcuts button:last-child{
+            border-right:0;
+          }
+          .color-dicing-bet-shortcuts button:hover:not(:disabled){
             color:#fff;
-            border-color:rgba(176,132,255,.30);
+            background:rgba(157,108,255,.12);
+          }
+          .color-dicing-bet-shortcuts button:disabled{
+            opacity:.55;
+            cursor:default;
           }
           .color-dicing-rules{
             display:flex;
@@ -5970,8 +6177,1038 @@ useEffect(() => {
           </button>
         </div>
       )}
-      <header className="nav">
-        <div className="brand">
+
+      <style>{`
+        /* ============================================================
+           CASEX DESIGN 4 — FUTURISTIC GRID DASHBOARD
+           Scoped to the current home app. Gameplay logic untouched.
+           ============================================================ */
+        .casex-design4-nav{
+          position:relative;
+          z-index:1200;
+        }
+        .casex-design4-nav .nav-actions .balance-button{display:none !important}
+        .casex-design4-nav > nav{padding-right:188px;}
+        .casex-d4-balance-center{
+          position:absolute;
+          left:50%;
+          top:50%;
+          transform:translate(-50%,-50%);
+          display:flex;
+          align-items:center;
+          gap:10px;
+          min-width:172px;
+          height:46px;
+          padding:0 13px;
+          border:1px solid rgba(157,113,241,.42);
+          border-radius:12px;
+          background:linear-gradient(180deg,rgba(21,18,35,.96),rgba(9,10,16,.96));
+          color:#fff;
+          box-shadow:0 8px 24px rgba(53,26,104,.22), inset 0 1px 0 rgba(255,255,255,.035);
+          cursor:pointer;
+        }
+        .casex-d4-balance-icon{font-size:15px;line-height:1}
+        .casex-d4-balance-copy{display:flex;flex-direction:column;align-items:flex-start;line-height:1.05}
+        .casex-d4-balance-copy small{color:#777a88;font-size:7px;font-weight:900;letter-spacing:.16em;text-transform:uppercase}
+        .casex-d4-balance-copy strong{font-size:14px;font-weight:950;letter-spacing:-.02em}
+        .casex-d4-balance-plus{margin-left:auto;color:#b98bff;font-size:16px;font-weight:900}
+        .casex-design4-main{
+          position:relative;
+          min-height:100vh;
+          padding-left:236px !important;
+          background:
+            radial-gradient(circle at 75% 7%,rgba(127,75,221,.14),transparent 23%),
+            radial-gradient(circle at 16% 80%,rgba(56,77,156,.08),transparent 23%),
+            linear-gradient(180deg,#05060a 0%,#070812 47%,#05060a 100%) !important;
+        }
+        .casex-design4-main::before{
+          content:"";
+          position:absolute;
+          inset:0;
+          pointer-events:none;
+          background-image:
+            linear-gradient(rgba(163,123,238,.028) 1px,transparent 1px),
+            linear-gradient(90deg,rgba(163,123,238,.028) 1px,transparent 1px);
+          background-size:54px 54px;
+          mask-image:linear-gradient(to bottom,rgba(0,0,0,.85),transparent 94%);
+        }
+        .casex-d4-sidebar{
+          position:fixed;
+          left:0;
+          top:74px;
+          bottom:0;
+          width:236px;
+          padding:18px 14px 16px;
+          box-sizing:border-box;
+          border-right:1px solid rgba(92,84,125,.2);
+          background:linear-gradient(180deg,rgba(10,11,17,.98),rgba(7,8,13,.98));
+          box-shadow:12px 0 32px rgba(0,0,0,.12);
+          z-index:1100;
+          overflow:auto;
+        }
+        .casex-d4-sidebar-head{display:flex;align-items:center;gap:10px;padding:6px 8px 18px}
+        .casex-d4-sidebar-logo{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:linear-gradient(145deg,#7548df,#a471ff);box-shadow:0 10px 25px rgba(118,67,218,.22);font-size:17px;font-weight:950}
+        .casex-d4-sidebar-head strong{display:block;color:#f6f3fa;font-size:13px;letter-spacing:.02em}
+        .casex-d4-sidebar-head small{display:block;margin-top:2px;color:#6f7180;font-size:7px;font-weight:900;letter-spacing:.18em}
+        .casex-d4-side-label{margin:10px 8px 7px;color:#636676;font-size:7px;font-weight:950;letter-spacing:.18em}
+        .casex-d4-side-link,.casex-d4-side-game{
+          width:100%;
+          border:0;
+          border-radius:9px;
+          background:transparent;
+          color:#a2a5b3;
+          display:flex;
+          align-items:center;
+          text-align:left;
+          cursor:pointer;
+          transition:background .16s ease,color .16s ease,border-color .16s ease,transform .16s ease;
+        }
+        .casex-d4-side-link{gap:10px;padding:10px 11px;font-size:10px;font-weight:800}
+        .casex-d4-side-link span{width:17px;display:inline-grid;place-items:center;color:#777b8c;font-size:12px}
+        .casex-d4-side-link:hover,.casex-d4-side-link.active{background:linear-gradient(90deg,rgba(115,67,204,.28),rgba(75,40,130,.12));color:#fff}
+        .casex-d4-side-link.active{box-shadow:inset 2px 0 0 #a66eff}
+        .casex-d4-side-game{gap:9px;padding:7px 8px;color:#c9c6d2;font-size:9px;font-weight:800}
+        .casex-d4-side-game:hover{background:rgba(255,255,255,.035);color:#fff;transform:translateX(2px)}
+        .casex-d4-side-game-icon{width:28px;height:28px;border-radius:9px;display:grid;place-items:center;font-size:14px;background:linear-gradient(145deg,#171b29,#0e1018);border:1px solid rgba(124,112,170,.23)}
+        .casex-d4-side-game.dicing .casex-d4-side-game-icon{background:linear-gradient(145deg,rgba(59,79,145,.8),rgba(26,38,82,.65))}
+        .casex-d4-side-game.mines .casex-d4-side-game-icon{background:linear-gradient(145deg,rgba(99,40,52,.8),rgba(45,15,28,.65))}
+        .casex-d4-side-game.towers .casex-d4-side-game-icon{background:linear-gradient(145deg,rgba(45,59,148,.8),rgba(31,24,86,.65))}
+        .casex-d4-side-game.plinko .casex-d4-side-game-icon{background:linear-gradient(145deg,rgba(100,39,133,.82),rgba(51,22,83,.65))}
+        .casex-d4-side-game.chicken .casex-d4-side-game-icon{background:linear-gradient(145deg,rgba(126,77,28,.82),rgba(67,39,15,.64))}
+        .casex-d4-side-game.coinflip .casex-d4-side-game-icon{background:linear-gradient(145deg,rgba(25,103,91,.82),rgba(10,57,50,.64))}
+        .casex-d4-sidebar-spacer{min-height:18px}
+        .casex-d4-sidebar-promo{margin:12px 3px 0;padding:12px 10px;border:1px solid rgba(124,102,167,.2);border-radius:11px;background:linear-gradient(145deg,rgba(36,24,61,.75),rgba(14,13,20,.8));display:flex;align-items:flex-start;gap:9px}
+        .casex-d4-promo-icon{width:27px;height:27px;border-radius:8px;display:grid;place-items:center;background:rgba(128,74,225,.18);color:#b98cff;font-size:14px}
+        .casex-d4-sidebar-promo strong{display:block;color:#c39dff;font-size:7px;letter-spacing:.13em}
+        .casex-d4-sidebar-promo small{display:block;margin-top:4px;color:#757888;font-size:7px;line-height:1.4}
+        .casex-d4-content{position:relative;z-index:2;min-width:0;padding:26px 28px 48px}
+        .casex-d4-content .hero{
+          min-height:292px !important;
+          margin:0 0 26px !important;
+          padding:34px 34px 30px !important;
+          grid-template-columns:1fr !important;
+          max-width:none !important;
+          border:1px solid rgba(110,93,149,.28) !important;
+          border-radius:17px !important;
+          background:
+            radial-gradient(circle at 76% 30%,rgba(113,67,210,.17),transparent 27%),
+            linear-gradient(145deg,#0d1019,#080a10 68%,#0b0913) !important;
+          box-shadow:0 24px 70px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.025);
+          overflow:hidden;
+        }
+        .casex-d4-content .hero::before{
+          content:"";position:absolute;inset:0;pointer-events:none;opacity:.7;
+          background-image:linear-gradient(rgba(151,118,226,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(151,118,226,.05) 1px,transparent 1px);
+          background-size:38px 38px;
+          mask-image:linear-gradient(90deg,rgba(0,0,0,.85),transparent 100%);
+        }
+        .casex-d4-content .hero::after{
+          content:"";position:absolute;right:-90px;top:-140px;width:620px;height:520px;border-radius:50%;border:1px solid rgba(163,118,255,.12);box-shadow:0 0 0 30px rgba(129,71,221,.025),0 0 0 70px rgba(129,71,221,.016);pointer-events:none;
+        }
+        .casex-d4-content .hero-case{display:none !important}
+        .casex-d4-content .hero-copy{position:relative;z-index:3;max-width:760px}
+        .casex-d4-content .hero h1{font-size:clamp(46px,5vw,76px) !important;line-height:.93 !important;letter-spacing:-.055em !important;margin:12px 0 14px !important}
+        .casex-d4-content .hero h1 span{color:#a772ff !important}
+        .casex-d4-content .hero p{font-size:12px !important;color:#86899a !important;max-width:640px !important;line-height:1.55}
+        .casex-d4-content .hero-cta{margin-top:18px !important;display:inline-flex !important}
+        .casex-d4-content .hero-stats,.casex-d4-content .hero-trust-strip{display:none !important}
+
+        .casex-game-hub{
+          width:100% !important;
+          max-width:none !important;
+          margin:0 0 28px !important;
+          padding:0 !important;
+        }
+        .casex-hub-heading{display:none !important}
+        .casex-hub-heading h2,.casex-all-games-heading h2{font-size:28px !important;letter-spacing:-.045em !important;margin-top:6px !important}
+        .casex-hub-heading .home-section-link,.casex-featured-games{display:none !important}
+        .casex-all-games-heading{margin:0 0 14px !important}
+        .casex-all-games-heading > div{display:flex;align-items:flex-end;justify-content:space-between}
+        .casex-all-games{display:grid !important;grid-template-columns:repeat(6,minmax(0,1fr)) !important;gap:10px !important}
+        .casex-all-games .casex-mini-game{
+          position:relative !important;min-height:238px !important;padding:14px 11px 11px !important;border-radius:13px !important;border:1px solid rgba(103,94,131,.33) !important;background:linear-gradient(165deg,#11131b,#090b11) !important;overflow:hidden !important;text-align:left !important;box-shadow:0 14px 35px rgba(0,0,0,.18) !important;transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease !important;
+        }
+        .casex-all-games .casex-mini-game::before{content:"";position:absolute;inset:0;opacity:.95;pointer-events:none;background:radial-gradient(circle at 50% 4%,rgba(132,78,255,.18),transparent 40%),linear-gradient(145deg,rgba(255,255,255,.02),transparent 35%,rgba(0,0,0,.1));}
+        .casex-all-games .casex-mini-game::after{content:"";position:absolute;right:-20px;bottom:-25px;width:105px;height:105px;border-radius:50%;filter:blur(18px);opacity:.42;pointer-events:none;}
+        .casex-all-games .casex-mini-game:hover{transform:translateY(-3px);border-color:rgba(150,105,232,.58) !important;box-shadow:0 22px 52px rgba(61,30,115,.25) !important}
+        .casex-all-games .casex-mini-icon{position:relative;z-index:2;width:70px !important;height:70px !important;border-radius:15px !important;display:grid !important;place-items:center !important;font-size:34px !important;background:linear-gradient(145deg,#1a1e2f,#0d111a) !important;border:1px solid rgba(132,114,182,.26) !important;box-shadow:0 16px 38px rgba(0,0,0,.2) !important}
+        .casex-all-games .casex-mini-game strong{position:relative;z-index:2;margin-top:14px !important;font-size:14px !important;font-weight:950 !important;letter-spacing:-.02em !important}
+        .casex-all-games .casex-mini-game small{position:relative;z-index:2;margin-top:5px !important;color:#7d8190 !important;font-size:8px !important;line-height:1.35 !important}
+        .casex-all-games .casex-mini-game b{position:relative;z-index:2;margin-top:auto !important;align-self:stretch !important;display:flex !important;justify-content:center !important;align-items:center !important;min-height:31px !important;border-radius:8px !important;border:1px solid rgba(145,95,240,.42) !important;background:linear-gradient(100deg,#3c2082,#7443c8) !important;color:#fff !important;font-size:8px !important;font-weight:950 !important;letter-spacing:.02em}
+        .casex-all-games .dicing::after{background:radial-gradient(circle,rgba(41,113,255,.58),transparent 68%)}
+        .casex-all-games .mines::after{background:radial-gradient(circle,rgba(229,59,97,.58),transparent 68%)}
+        .casex-all-games .towers::after{background:radial-gradient(circle,rgba(78,112,255,.6),transparent 68%)}
+        .casex-all-games .plinko::after{background:radial-gradient(circle,rgba(183,53,255,.58),transparent 68%)}
+        .casex-all-games .chicken::after{background:radial-gradient(circle,rgba(255,158,37,.62),transparent 68%)}
+        .casex-all-games .coinflip::after{background:radial-gradient(circle,rgba(38,187,160,.62),transparent 68%)}
+
+        .casex-d4-content #cases{
+          width:100% !important;
+          max-width:none !important;
+          margin:28px 0 0 !important;
+          padding:24px !important;
+          border:1px solid rgba(92,83,122,.22) !important;
+          border-radius:17px !important;
+          background:linear-gradient(160deg,rgba(14,16,24,.92),rgba(8,9,14,.84)) !important;
+        }
+        .casex-d4-content #cases .case-grid{grid-template-columns:repeat(4,minmax(0,1fr)) !important;gap:11px !important}
+        .casex-d4-content #cases .section-head h2{font-size:28px !important}
+        .casex-d4-content #cases .case-card{border-radius:13px !important}
+        .casex-d4-content #cases .case-card-topline .tag{font-size:7px !important}
+
+        .casex-d4-content > section:not(.casex-game-hub):not(.home-feature-zone):not(#cases){
+          position:relative;
+          z-index:2;
+        }
+        .casex-d4-content .home-feature-zone{margin-top:28px !important}
+
+        @media(max-width:1200px){
+          .casex-all-games{grid-template-columns:repeat(3,minmax(0,1fr)) !important}
+          .casex-all-games .casex-mini-game{min-height:210px !important}
+        }
+        @media(max-width:900px){
+          .casex-d4-sidebar{width:210px}
+          .casex-design4-main{padding-left:210px !important}
+          .casex-d4-content{padding:22px 18px 42px}
+          .casex-d4-balance-center{min-width:150px}
+        }
+        @media(max-width:700px){
+          .casex-d4-sidebar{position:sticky;top:74px;bottom:auto;width:100%;height:auto;border-right:0;border-bottom:1px solid rgba(92,84,125,.22);padding:9px 10px;display:flex;gap:7px;overflow:auto;flex-wrap:nowrap}
+          .casex-d4-sidebar-head,.casex-d4-side-label,.casex-d4-sidebar-spacer,.casex-d4-sidebar-promo{display:none}
+          .casex-d4-side-link,.casex-d4-side-game{width:auto;flex:0 0 auto;white-space:nowrap}
+          .casex-d4-side-link{padding:8px 10px}
+          .casex-d4-side-game{padding:6px 8px}
+          .casex-d4-side-game-icon{width:24px;height:24px;font-size:12px}
+          .casex-design4-main{padding-left:0 !important}
+          .casex-d4-content{padding:14px 11px 34px}
+          .casex-d4-balance-center{position:relative;left:auto;top:auto;transform:none;margin:auto;height:40px;min-width:138px}
+          .casex-d4-content .hero{min-height:260px !important;padding:27px 22px !important}
+          .casex-d4-content .hero h1{font-size:48px !important}
+          .casex-all-games{grid-template-columns:repeat(2,minmax(0,1fr)) !important}
+          .casex-d4-content #cases .case-grid{grid-template-columns:repeat(2,minmax(0,1fr)) !important}
+        }
+      `}</style>
+
+<style>{`
+        /* ============================================================
+           CASEX DESIGN 4 — VISUAL CORRECTION / PREMIUM SHUFFLE-LIKE PASS
+           Layout-only / presentation-only overrides. Game logic untouched.
+           ============================================================ */
+        .casex-design4-nav{
+          position:sticky !important;
+          top:0 !important;
+          min-height:74px !important;
+          padding:0 28px !important;
+          background:rgba(5,6,10,.96) !important;
+          border-bottom:1px solid rgba(113,96,155,.18) !important;
+          backdrop-filter:blur(18px) !important;
+          box-sizing:border-box !important;
+        }
+        .casex-design4-nav .brand{position:relative;z-index:5;flex:0 0 auto}
+        .casex-design4-nav > nav{
+          position:absolute !important;
+          left:50% !important;
+          top:50% !important;
+          transform:translate(-50%,-50%) !important;
+          padding:0 !important;
+          display:flex !important;
+          align-items:center !important;
+          gap:8px !important;
+          z-index:4 !important;
+        }
+        .casex-design4-nav > nav > .color-dicing-nav-link,
+        .casex-design4-nav > nav > .nav-game-selector{display:none !important}
+        .casex-design4-nav > nav > .nav-link-button{display:none !important}
+        .casex-d4-balance-center{
+          position:absolute !important;
+          left:50% !important;
+          top:50% !important;
+          transform:translate(-50%,-50%) !important;
+          z-index:20 !important;
+          min-width:178px !important;
+          width:178px !important;
+          height:46px !important;
+          border-radius:12px !important;
+          background:linear-gradient(180deg,#171324,#0d0d15) !important;
+          border:1px solid rgba(161,116,240,.56) !important;
+          box-shadow:0 0 0 1px rgba(110,74,187,.08),0 14px 32px rgba(55,28,110,.28),inset 0 1px 0 rgba(255,255,255,.04) !important;
+        }
+        .casex-design4-nav .nav-actions{position:relative;z-index:8;margin-left:auto !important}
+
+        .casex-design4-main{
+          padding-left:214px !important;
+          background:
+            radial-gradient(900px 500px at 70% 10%,rgba(113,66,214,.12),transparent 67%),
+            radial-gradient(650px 420px at 22% 58%,rgba(44,75,156,.08),transparent 65%),
+            linear-gradient(180deg,#07080e 0%,#06070b 52%,#05060a 100%) !important;
+        }
+        .casex-design4-main::before{background-size:46px 46px;opacity:.72}
+
+        .casex-d4-sidebar{
+          top:74px !important;
+          width:214px !important;
+          padding:20px 12px 18px !important;
+          background:linear-gradient(180deg,#090a10,#07080c) !important;
+          border-right:1px solid rgba(103,94,136,.20) !important;
+          box-shadow:10px 0 40px rgba(0,0,0,.18) !important;
+        }
+        .casex-d4-sidebar-head{padding:6px 8px 20px !important}
+        .casex-d4-sidebar-logo{width:36px !important;height:36px !important;border-radius:11px !important}
+        .casex-d4-side-label{margin:13px 8px 8px !important;color:#55596a !important;font-size:7px !important}
+        .casex-d4-side-link{padding:10px 11px !important;border-radius:10px !important;font-size:10px !important}
+        .casex-d4-side-game{padding:8px 8px !important;border-radius:10px !important;font-size:9px !important}
+        .casex-d4-side-game-icon{width:32px !important;height:32px !important;border-radius:10px !important;font-size:15px !important}
+        .casex-d4-sidebar-promo{margin-top:auto !important}
+
+        .casex-d4-content{
+          padding:24px 30px 64px !important;
+          max-width:1500px !important;
+          margin:0 auto !important;
+        }
+        .casex-d4-content .hero{
+          position:relative !important;
+          min-height:340px !important;
+          margin:0 0 30px !important;
+          padding:34px 38px !important;
+          display:block !important;
+          border-radius:20px !important;
+          border:1px solid rgba(127,106,178,.30) !important;
+          background:
+            radial-gradient(680px 360px at 84% 52%,rgba(130,74,234,.22),transparent 64%),
+            radial-gradient(480px 320px at 12% 100%,rgba(44,79,152,.15),transparent 68%),
+            linear-gradient(145deg,#10111a,#090b11 64%,#0c0914) !important;
+          box-shadow:0 28px 80px rgba(0,0,0,.32),inset 0 1px 0 rgba(255,255,255,.035) !important;
+          overflow:hidden !important;
+        }
+        .casex-d4-content .hero::before{
+          content:"" !important;
+          position:absolute !important;
+          inset:0 !important;
+          pointer-events:none !important;
+          opacity:.58 !important;
+          background-image:linear-gradient(rgba(156,119,230,.055) 1px,transparent 1px),linear-gradient(90deg,rgba(156,119,230,.055) 1px,transparent 1px) !important;
+          background-size:42px 42px !important;
+          mask-image:linear-gradient(90deg,#000 0%,rgba(0,0,0,.6) 62%,transparent 100%) !important;
+        }
+        .casex-d4-content .hero::after{
+          content:"" !important;
+          position:absolute !important;
+          width:560px !important;
+          height:560px !important;
+          right:-60px !important;
+          top:-160px !important;
+          border-radius:50% !important;
+          border:1px solid rgba(165,116,255,.12) !important;
+          box-shadow:0 0 0 42px rgba(126,73,228,.028),0 0 0 90px rgba(126,73,228,.018) !important;
+          pointer-events:none !important;
+        }
+        .casex-d4-content .hero-copy{
+          position:relative !important;
+          z-index:5 !important;
+          width:54% !important;
+          max-width:670px !important;
+          margin:0 !important;
+          transform:none !important;
+        }
+        .casex-d4-content .hero .eyebrow{font-size:9px !important;letter-spacing:.16em !important}
+        .casex-d4-content .hero h1{
+          margin:12px 0 14px !important;
+          font-size:clamp(54px,5.2vw,82px) !important;
+          line-height:.91 !important;
+          max-width:640px !important;
+          position:relative !important;
+          z-index:6 !important;
+        }
+        .casex-d4-content .hero h1 span{color:#a875ff !important;text-shadow:0 0 34px rgba(153,92,255,.16)}
+        .casex-d4-content .hero p{font-size:12px !important;max-width:530px !important;color:#8b8e9e !important}
+        .casex-d4-content .hero-cta{margin-top:20px !important;min-height:40px !important;padding:0 15px !important}
+        .casex-d4-content .hero-stats,.casex-d4-content .hero-trust-strip{display:none !important}
+
+        .casex-d4-content .hero-case{
+          display:block !important;
+          position:absolute !important;
+          top:0 !important;
+          right:-8px !important;
+          width:49% !important;
+          height:100% !important;
+          z-index:3 !important;
+          opacity:.92 !important;
+          transform:scale(.82) !important;
+          transform-origin:center right !important;
+        }
+        .casex-d4-content .hero-case-aura{opacity:.68 !important}
+        .casex-d4-content .hero-case-box{filter:drop-shadow(0 30px 50px rgba(0,0,0,.52)) !important}
+        .casex-d4-content .hero-live-wins{display:none !important}
+        .casex-d4-content .rarity-card{display:none !important}
+
+        .casex-game-hub{
+          margin:0 0 28px !important;
+          padding:0 !important;
+        }
+        .casex-hub-heading{display:none !important}
+        .casex-all-games-heading{
+          margin:0 0 16px !important;
+          padding:0 2px !important;
+        }
+        .casex-all-games-heading > div{
+          display:block !important;
+        }
+        .casex-all-games-heading .eyebrow{font-size:9px !important;letter-spacing:.17em !important;color:#a979ff !important}
+        .casex-all-games-heading h2{
+          margin:7px 0 0 !important;
+          font-size:34px !important;
+          line-height:1 !important;
+          letter-spacing:-.045em !important;
+        }
+        .casex-all-games{
+          display:grid !important;
+          grid-template-columns:repeat(6,minmax(0,1fr)) !important;
+          gap:12px !important;
+        }
+        .casex-all-games .casex-mini-game{
+          min-height:250px !important;
+          padding:12px !important;
+          border-radius:16px !important;
+          border:1px solid rgba(104,95,132,.36) !important;
+          background:linear-gradient(165deg,#11131c,#090b11) !important;
+          box-shadow:0 20px 48px rgba(0,0,0,.22) !important;
+        }
+        .casex-all-games .casex-mini-game::before{
+          background:
+            radial-gradient(circle at 50% 7%,rgba(141,92,255,.20),transparent 42%),
+            linear-gradient(180deg,rgba(255,255,255,.018),transparent 38%,rgba(0,0,0,.18)) !important;
+        }
+        .casex-all-games .casex-mini-game::after{width:150px !important;height:150px !important;right:-35px !important;bottom:-45px !important;filter:blur(22px) !important;opacity:.5 !important}
+        .casex-all-games .casex-mini-icon{
+          width:96px !important;
+          height:96px !important;
+          border-radius:22px !important;
+          font-size:48px !important;
+          margin:0 auto !important;
+          background:linear-gradient(145deg,#1c2030,#10131d) !important;
+          border:1px solid rgba(142,123,199,.30) !important;
+          box-shadow:0 22px 42px rgba(0,0,0,.30) !important;
+        }
+        .casex-all-games .casex-mini-game strong{
+          display:block !important;
+          margin:16px 0 0 !important;
+          text-align:center !important;
+          font-size:14px !important;
+        }
+        .casex-all-games .casex-mini-game small{
+          display:block !important;
+          margin:6px auto 0 !important;
+          text-align:center !important;
+          font-size:8px !important;
+          min-height:22px !important;
+        }
+        .casex-all-games .casex-mini-game b{
+          margin-top:12px !important;
+          min-height:34px !important;
+          border-radius:9px !important;
+          font-size:8px !important;
+          background:linear-gradient(100deg,#4a2698,#844be1) !important;
+        }
+
+        .casex-d4-content #cases{
+          margin-top:34px !important;
+          padding:24px !important;
+          border-radius:18px !important;
+          background:linear-gradient(160deg,#0e1018,#08090e) !important;
+          border-color:rgba(102,93,133,.28) !important;
+        }
+
+        @media(max-width:1200px){
+          .casex-all-games{grid-template-columns:repeat(3,minmax(0,1fr)) !important}
+          .casex-d4-content .hero-copy{width:62% !important}
+          .casex-d4-content .hero-case{width:46% !important;transform:scale(.72) !important}
+        }
+        @media(max-width:900px){
+          .casex-design4-main{padding-left:190px !important}
+          .casex-d4-sidebar{width:190px !important}
+          .casex-d4-content{padding:20px 18px 48px !important}
+          .casex-d4-content .hero{padding:30px !important}
+          .casex-d4-content .hero-copy{width:100% !important;max-width:600px !important}
+          .casex-d4-content .hero-case{opacity:.45 !important;right:-110px !important;transform:scale(.66) !important}
+        }
+        /* ============================================================
+           CASEX DESIGN 4 — SIDEBAR TOGGLE + HEADER SPACING
+           ============================================================ */
+        .casex-design4-nav{
+          margin-top:-76px !important;
+          min-height:74px !important;
+          height:74px !important;
+        }
+
+        .casex-d4-menu-toggle{
+          width:40px !important;
+          height:40px !important;
+          flex:0 0 40px !important;
+          display:flex !important;
+          flex-direction:column !important;
+          align-items:center !important;
+          justify-content:center !important;
+          gap:5px !important;
+          padding:0 !important;
+          margin-right:10px !important;
+          border:1px solid rgba(126,106,170,.28) !important;
+          border-radius:10px !important;
+          background:rgba(15,16,24,.86) !important;
+          color:#d8d0e8 !important;
+          cursor:pointer !important;
+          z-index:30 !important;
+          transition:border-color .18s ease,background .18s ease,transform .18s ease !important;
+        }
+        .casex-d4-menu-toggle:hover{
+          border-color:rgba(163,120,242,.62) !important;
+          background:rgba(27,22,39,.96) !important;
+        }
+        .casex-d4-menu-toggle span{
+          display:block !important;
+          width:18px !important;
+          height:2px !important;
+          border-radius:999px !important;
+          background:#d8d0e8 !important;
+          transition:transform .2s ease,opacity .2s ease !important;
+        }
+        .casex-d4-menu-toggle.is-open span:nth-child(1){transform:translateY(7px) rotate(45deg) !important;}
+        .casex-d4-menu-toggle.is-open span:nth-child(2){opacity:0 !important;}
+        .casex-d4-menu-toggle.is-open span:nth-child(3){transform:translateY(-7px) rotate(-45deg) !important;}
+
+        .casex-d4-sidebar{
+          transition:transform .24s cubic-bezier(.2,.75,.2,1),opacity .18s ease !important;
+        }
+        .casex-d4-sidebar-closed{
+          padding-left:0 !important;
+        }
+        .casex-d4-sidebar-closed .casex-d4-sidebar{
+          transform:translateX(-102%) !important;
+          opacity:.98 !important;
+          pointer-events:none !important;
+        }
+        .casex-d4-sidebar-open .casex-d4-sidebar{
+          transform:translateX(0) !important;
+          pointer-events:auto !important;
+        }
+
+        .casex-d4-side-label{
+          font-size:8px !important;
+          line-height:1.2 !important;
+        }
+        .casex-d4-side-link{
+          min-height:42px !important;
+          padding:10px 12px !important;
+          font-size:12px !important;
+        }
+        .casex-d4-side-game{
+          min-height:44px !important;
+          padding:8px 10px !important;
+          font-size:11px !important;
+        }
+        .casex-d4-side-game-icon{
+          width:34px !important;
+          height:34px !important;
+          font-size:16px !important;
+        }
+
+        @media(max-width:700px){
+          .casex-design4-nav{padding:0 14px !important}
+          .casex-d4-balance-center{min-width:150px !important;width:150px !important}
+          .casex-d4-sidebar{position:sticky !important;top:74px !important;width:100% !important;height:auto !important;border-right:0 !important;border-bottom:1px solid rgba(92,84,125,.22) !important}
+          .casex-design4-main{padding-left:0 !important}
+          .casex-d4-content{padding:14px 12px 32px !important}
+          .casex-d4-content .hero{min-height:300px !important;padding:26px 22px !important}
+          .casex-d4-content .hero h1{font-size:52px !important}
+          .casex-d4-content .hero-case{display:none !important}
+          .casex-all-games{grid-template-columns:repeat(2,minmax(0,1fr)) !important}
+        }
+        @media(max-width:700px){
+          .casex-design4-nav{margin-top:-68px !important;min-height:68px !important;height:68px !important;}
+          .casex-d4-menu-toggle{width:36px !important;height:36px !important;flex-basis:36px !important;margin-right:8px !important;}
+          .casex-d4-menu-toggle span{width:16px !important;}
+          .casex-d4-sidebar{
+            top:68px !important;
+            transform:translateX(0) !important;
+          }
+          .casex-d4-sidebar-closed .casex-d4-sidebar{
+            transform:translateX(-102%) !important;
+          }
+          .casex-d4-sidebar-closed .casex-d4-content{
+            width:100% !important;
+          }
+        }
+
+        `}</style>
+
+      <style>{`
+        /* ============================================================
+           CASEX DESIGN 4 — PERSISTENT GAME SIDEBAR
+           Visible above OriginalGames overlay; collapse to icon rail.
+           ============================================================ */
+        .casex-design4-nav .casex-d4-menu-toggle{
+          position:relative !important;
+          z-index:5000 !important;
+        }
+        .casex-design4-nav .brand-mark{
+          width:38px !important;
+          height:38px !important;
+          border-radius:11px !important;
+          font-size:19px !important;
+        }
+        .casex-design4-nav .brand{
+          font-size:16px !important;
+        }
+        .casex-d4-game-sidebar{
+          position:fixed !important;
+          left:0 !important;
+          top:76px !important;
+          bottom:0 !important;
+          width:214px !important;
+          padding:18px 12px 14px !important;
+          box-sizing:border-box !important;
+          display:flex !important;
+          flex-direction:column !important;
+          background:linear-gradient(180deg,#090a10,#07080d 72%,#06070b) !important;
+          border-right:1px solid rgba(103,94,136,.24) !important;
+          box-shadow:14px 0 40px rgba(0,0,0,.28) !important;
+          z-index:2600 !important;
+          overflow:auto !important;
+          transition:width .22s cubic-bezier(.2,.75,.2,1),padding .22s ease !important;
+          scrollbar-width:thin;
+        }
+        .casex-d4-game-sidebar.is-collapsed{
+          width:72px !important;
+          padding-left:10px !important;
+          padding-right:10px !important;
+        }
+        .casex-d4-game-sidebar-head{
+          display:flex !important;
+          align-items:center !important;
+          gap:10px !important;
+          padding:3px 6px 20px !important;
+          min-height:48px !important;
+        }
+        .casex-d4-game-sidebar-logo{
+          width:42px !important;
+          height:42px !important;
+          flex:0 0 42px !important;
+          display:grid !important;
+          place-items:center !important;
+          border-radius:12px !important;
+          background:linear-gradient(145deg,#7548df,#a471ff) !important;
+          box-shadow:0 10px 26px rgba(118,67,218,.24) !important;
+          color:#fff !important;
+          font-size:20px !important;
+          font-weight:950 !important;
+        }
+        .casex-d4-game-sidebar-brand strong{display:block;color:#f6f3fa;font-size:15px;font-weight:950}
+        .casex-d4-game-sidebar-brand small{display:block;margin-top:2px;color:#737687;font-size:7px;font-weight:900;letter-spacing:.18em}
+        .casex-d4-game-sidebar-label{
+          margin:3px 8px 8px !important;
+          color:#676a7a !important;
+          font-size:8px !important;
+          font-weight:950 !important;
+          letter-spacing:.16em !important;
+        }
+        .casex-d4-game-side-item,.casex-d4-game-sidebar-back{
+          width:100% !important;
+          min-height:46px !important;
+          display:flex !important;
+          align-items:center !important;
+          gap:10px !important;
+          padding:7px 8px !important;
+          margin:1px 0 !important;
+          border:1px solid transparent !important;
+          border-radius:10px !important;
+          background:transparent !important;
+          color:#c6c4d0 !important;
+          font:inherit !important;
+          font-size:12px !important;
+          font-weight:850 !important;
+          text-align:left !important;
+          cursor:pointer !important;
+          transition:background .16s ease,border-color .16s ease,color .16s ease,transform .16s ease !important;
+        }
+        .casex-d4-game-side-item:hover,.casex-d4-game-side-item.active,.casex-d4-game-sidebar-back:hover{
+          background:linear-gradient(90deg,rgba(113,63,199,.24),rgba(82,48,137,.10)) !important;
+          border-color:rgba(146,102,221,.22) !important;
+          color:#fff !important;
+        }
+        .casex-d4-game-side-item.active{box-shadow:inset 2px 0 0 #a66eff !important}
+        .casex-d4-game-side-icon{
+          width:34px !important;
+          height:34px !important;
+          flex:0 0 34px !important;
+          display:grid !important;
+          place-items:center !important;
+          border-radius:10px !important;
+          background:linear-gradient(145deg,#171b29,#0d1018) !important;
+          border:1px solid rgba(124,112,170,.26) !important;
+          font-size:16px !important;
+        }
+        .casex-d4-game-side-copy{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .casex-d4-game-sidebar-spacer{flex:1 1 auto;min-height:18px}
+        .casex-d4-game-sidebar-back{color:#999cab !important}
+        .casex-d4-game-sidebar.is-collapsed .casex-d4-game-sidebar-head{justify-content:center;padding-left:0 !important;padding-right:0 !important}
+        .casex-d4-game-sidebar.is-collapsed .casex-d4-game-sidebar-brand,
+        .casex-d4-game-sidebar.is-collapsed .casex-d4-game-sidebar-label,
+        .casex-d4-game-sidebar.is-collapsed .casex-d4-game-side-copy{display:none !important}
+        .casex-d4-game-sidebar.is-collapsed .casex-d4-game-side-item,
+        .casex-d4-game-sidebar.is-collapsed .casex-d4-game-sidebar-back{
+          justify-content:center !important;
+          padding-left:0 !important;
+          padding-right:0 !important;
+        }
+        .casex-d4-game-sidebar.is-collapsed .casex-d4-game-sidebar-spacer{min-height:8px}
+        @media(max-width:700px){
+          .casex-d4-game-sidebar{top:68px !important;width:184px !important}
+          .casex-d4-game-sidebar.is-collapsed{width:64px !important}
+          .casex-d4-game-sidebar-logo{width:38px !important;height:38px !important;flex-basis:38px !important}
+          .casex-design4-nav .brand-mark{width:34px !important;height:34px !important;font-size:17px !important}
+        }
+      `}</style>
+
+      <style>{`
+        /* ============================================================
+           CASEX DESIGN 4 — GAME CONTENT OFFSET FOR SIDEBAR
+           Keep the game content beside the fixed sidebar instead of
+           letting the sidebar sit on top of the game.
+           ============================================================ */
+        .casex-d4-original-game-stage{
+          position:relative !important;
+          z-index:1200 !important;
+        }
+        .casex-d4-original-game-stage .original-games-overlay{
+          transition:left .22s cubic-bezier(.2,.75,.2,1),width .22s cubic-bezier(.2,.75,.2,1) !important;
+        }
+        .casex-d4-original-game-stage.sidebar-open .original-games-overlay{
+          left:214px !important;
+          right:0 !important;
+          width:auto !important;
+        }
+        .casex-d4-original-game-stage.sidebar-collapsed .original-games-overlay{
+          left:72px !important;
+          right:0 !important;
+          width:auto !important;
+        }
+        .casex-d4-original-game-stage.sidebar-open .original-games-game-tabs{
+          left:234px !important;
+        }
+        .casex-d4-original-game-stage.sidebar-collapsed .original-games-game-tabs{
+          left:92px !important;
+        }
+        /* Do not let the game canvas create a competing horizontal scroll. */
+        .casex-d4-original-game-stage .original-games-page{
+          max-width:100% !important;
+          overflow-x:hidden !important;
+        }
+        @media(max-width:700px){
+          .casex-d4-original-game-stage.sidebar-open .original-games-overlay{
+            left:184px !important;
+          }
+          .casex-d4-original-game-stage.sidebar-collapsed .original-games-overlay{
+            left:64px !important;
+          }
+          .casex-d4-original-game-stage.sidebar-open .original-games-game-tabs{
+            left:204px !important;
+          }
+          .casex-d4-original-game-stage.sidebar-collapsed .original-games-game-tabs{
+            left:84px !important;
+          }
+        }
+      `}</style>
+
+
+      <style>{`
+        /* ============================================================
+           CASEX DESIGN 4 — SINGLE PAGE SCROLL FOR ORIGINAL GAMES
+           The game overlay was independently scrollable, which made
+           the fixed sidebar appear detached from the page. Let the
+           document own the scroll so the sidebar stays anchored to
+           the main CASEX header while the game content moves naturally.
+           ============================================================ */
+        .original-games-overlay{
+          position:absolute !important;
+          inset:0 auto auto 0 !important;
+          width:100% !important;
+          min-height:100vh !important;
+          height:auto !important;
+          overflow:visible !important;
+        }
+
+        /* Keep the game navigation tabs attached to the viewport. */
+        .original-games-overlay .original-games-game-tabs{
+          position:fixed !important;
+          top:86px !important;
+          z-index:999999 !important;
+        }
+
+        /* ============================================================
+           CASEX DESIGN 4 — KEEP THE HOME HERO VISUAL INSIDE THE CARD
+           ============================================================ */
+        .casex-d4-content .hero{
+          overflow:hidden !important;
+        }
+        .casex-d4-content .hero-case{
+          right:10px !important;
+          top:4px !important;
+          width:46% !important;
+          height:96% !important;
+          transform:scale(.76) !important;
+          transform-origin:center right !important;
+        }
+
+        @media(max-width:1200px){
+          .casex-d4-content .hero-case{
+            right:2px !important;
+            width:44% !important;
+            transform:scale(.70) !important;
+          }
+        }
+
+        @media(max-width:900px){
+          .casex-d4-content .hero-case{
+            right:-32px !important;
+            width:48% !important;
+            transform:scale(.62) !important;
+          }
+        }
+
+        @media(max-width:700px){
+          .casex-d4-content .hero-case{
+            display:none !important;
+          }
+        }
+      `}</style>
+
+      <style>{`
+        /* ============================================================
+           CASEX DESIGN 4 — LOCK THE TOP NAV TO THE VIEWPORT
+           Keep the hamburger/logo/balance bar fixed while the page
+           scrolls. Content is offset so the nav never gets displaced.
+           ============================================================ */
+        .casex-design4-nav{
+          position:fixed !important;
+          top:0 !important;
+          left:0 !important;
+          right:0 !important;
+          width:100% !important;
+          margin-top:0 !important;
+          min-height:74px !important;
+          height:74px !important;
+          box-sizing:border-box !important;
+          z-index:5000 !important;
+        }
+
+        .casex-design4-main{
+          padding-top:74px !important;
+        }
+
+        .casex-design4-nav .casex-d4-menu-toggle,
+        .casex-design4-nav .brand,
+        .casex-design4-nav nav,
+        .casex-design4-nav .nav-actions{
+          position:relative !important;
+          z-index:2 !important;
+        }
+
+        /* The fixed game sidebar begins immediately below the fixed nav. */
+        .casex-d4-game-sidebar{
+          top:74px !important;
+        }
+
+        @media(max-width:700px){
+          .casex-design4-nav{
+            min-height:68px !important;
+            height:68px !important;
+          }
+          .casex-design4-main{
+            padding-top:68px !important;
+          }
+          .casex-d4-game-sidebar{
+            top:68px !important;
+          }
+        }
+      `}</style>
+
+      <style>{`/* CASEX Design 4 — content spacing when the sidebar is OPEN */
+        /* The sidebar is fixed at 214px. Move the ENTIRE homepage content
+           to the right only while the sidebar is open, without changing
+           the homepage sizing or layout when the sidebar is closed. */
+        @media(min-width:901px){
+          .casex-d4-sidebar-open .casex-d4-content{
+            position:relative !important;
+            left:60px !important;
+          }
+        }
+
+        @media(min-width:701px) and (max-width:900px){
+          .casex-d4-sidebar-open .casex-d4-content{
+            position:relative !important;
+            left:28px !important;
+          }
+        }
+
+
+        /* Remove the inner rectangle around the selected deposit currency. */
+        .wallet-modal-backdrop .casex-clean-select-live,
+        .wallet-modal-backdrop .casex-clean-select-live > select,
+        .wallet-modal-backdrop .casex-clean-select-live > select:hover,
+        .wallet-modal-backdrop .casex-clean-select-live > select:active,
+        .wallet-modal-backdrop .casex-clean-select-live > select:focus,
+        .wallet-modal-backdrop .casex-clean-select-live > select:focus-visible{
+          border:0 !important;
+          outline:none !important;
+          box-shadow:none !important;
+          background-color:transparent !important;
+        }
+
+        /* Keep the outer CASEX field border only. */
+        .wallet-modal-backdrop .casex-clean-select-live{
+          border:1px solid #30343d !important;
+        }
+
+        /* Initial deposit selector — one clean, clickable dropdown arrow. */
+        .wallet-modal-backdrop .wallet-input-wrap.wallet-input-premium > div{
+          position:relative !important;
+          overflow:hidden !important;
+        }
+
+        .wallet-modal-backdrop .wallet-input-wrap.wallet-input-premium > div::before{
+          content:"" !important;
+          display:block !important;
+          position:absolute !important;
+          right:13px !important;
+          top:50% !important;
+          width:7px !important;
+          height:7px !important;
+          margin-top:-5px !important;
+          border-right:1.5px solid #9da2ad !important;
+          border-bottom:1.5px solid #9da2ad !important;
+          transform:rotate(45deg) !important;
+          pointer-events:none !important;
+          z-index:2 !important;
+        }
+
+        .wallet-modal-backdrop .wallet-input-wrap.wallet-input-premium > div::after{
+          content:none !important;
+          display:none !important;
+        }
+
+        .wallet-modal-backdrop .wallet-input-wrap.wallet-input-premium > div > select.casex-wallet-native-hidden-arrow{
+          position:relative !important;
+          z-index:1 !important;
+          width:100% !important;
+          height:100% !important;
+          border:0 !important;
+          outline:0 !important;
+          box-shadow:none !important;
+          appearance:none !important;
+          -webkit-appearance:none !important;
+          -moz-appearance:none !important;
+          background:transparent !important;
+          background-image:none !important;
+          padding-right:36px !important;
+          color:inherit !important;
+          cursor:pointer !important;
+        }
+
+        .wallet-modal-backdrop .wallet-input-wrap.wallet-input-premium > div > select.casex-wallet-native-hidden-arrow::-ms-expand{
+          display:none !important;
+        }
+
+        .wallet-modal-backdrop .wallet-input-wrap.wallet-input-premium > div > select.casex-wallet-native-hidden-arrow:focus,
+        .wallet-modal-backdrop .wallet-input-wrap.wallet-input-premium > div > select.casex-wallet-native-hidden-arrow:focus-visible{
+          border:0 !important;
+          outline:0 !important;
+          box-shadow:none !important;
+        }
+      `}</style>
+
+      <style>{`
+        /* CASEX WALLET — V37 selector retained, arrow rendering cleaned up */
+        .wallet-modal-backdrop .wallet-input-wrap.wallet-input-premium > div{
+          position:relative !important;
+          overflow:hidden !important;
+          padding:0 !important;
+          background-color:#1e222a !important;
+          background-repeat:no-repeat !important;
+          background-position:right 12px center !important;
+          background-size:14px 14px !important;
+          background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 14 14'%3E%3Cpath d='M3.25 5.25 7 9l3.75-3.75' fill='none' stroke='%239da2ad' stroke-width='1.45' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") !important;
+        }
+
+        /* Kill every pseudo-arrow from the old selector CSS. */
+        .wallet-modal-backdrop .wallet-input-wrap.wallet-input-premium > div::before,
+        .wallet-modal-backdrop .wallet-input-wrap.wallet-input-premium > div::after{
+          content:none !important;
+          display:none !important;
+        }
+
+        /* The real SELECT is the only interactive layer and spans the whole
+           field, including the visual arrow area. */
+        .wallet-modal-backdrop .wallet-input-wrap.wallet-input-premium > div > select.casex-wallet-native-hidden-arrow{
+          display:block !important;
+          width:100% !important;
+          height:100% !important;
+          min-width:0 !important;
+          box-sizing:border-box !important;
+          margin:0 !important;
+          padding:0 40px 0 13px !important;
+          border:0 !important;
+          outline:0 !important;
+          box-shadow:none !important;
+          appearance:none !important;
+          -webkit-appearance:none !important;
+          -moz-appearance:none !important;
+          background:transparent !important;
+          background-image:none !important;
+          background-color:transparent !important;
+          cursor:pointer !important;
+          color:#f3f4f8 !important;
+          color-scheme:dark !important;
+        }
+
+        .wallet-modal-backdrop .wallet-input-wrap.wallet-input-premium > div > select.casex-wallet-native-hidden-arrow::-ms-expand{
+          display:none !important;
+        }
+
+        .wallet-modal-backdrop .wallet-input-wrap.wallet-input-premium > div > select.casex-wallet-native-hidden-arrow:focus,
+        .wallet-modal-backdrop .wallet-input-wrap.wallet-input-premium > div > select.casex-wallet-native-hidden-arrow:focus-visible{
+          border:0 !important;
+          outline:0 !important;
+          box-shadow:none !important;
+        }
+      `}</style>
+
+      <header className={`nav casex-design4-nav ${originalGameOpen ? "casex-d4-game-nav" : ""}`}>
+        <button
+          type="button"
+          className={`casex-d4-menu-toggle ${d4SidebarOpen ? "is-open" : ""}`}
+          onClick={() => setD4SidebarOpen((current) => !current)}
+          aria-label={d4SidebarOpen ? "Close sidebar" : "Open sidebar"}
+          aria-expanded={d4SidebarOpen}
+        >
+          <span></span><span></span><span></span>
+        </button>
+
+        <button
+          type="button"
+          className="brand"
+          onClick={() => {
+            if (opening) return;
+            if (!closeAllOverlaysForNavigation()) return;
+
+            requestAnimationFrame(() => {
+              window.scrollTo({
+                top: 0,
+                left: 0,
+                behavior: "smooth",
+              });
+            });
+          }}
+          aria-label="Go to CASEX home"
+        >
           <div className="brand-mark">
             ✦
           </div>
@@ -5979,7 +7216,7 @@ useEffect(() => {
           <span>
             CASE<span>X</span>
           </span>
-        </div>
+        </button>
 
         <nav>
           <button
@@ -5987,19 +7224,7 @@ useEffect(() => {
             className="nav-link-button"
             onClick={() => {
               if (opening) return;
-              if (colorDicingOpen) closeColorDicing();
-
-              if (colorDicingOpen) {
-                closeColorDicing();
-              }
-
-              if (casesPageOpen) {
-                closeCasesPage();
-              }
-
-              if (selected) {
-                closeCasePage();
-              }
+              if (!closeAllOverlaysForNavigation()) return;
 
               requestAnimationFrame(() => {
                 window.scrollTo({
@@ -6012,34 +7237,6 @@ useEffect(() => {
             Home
           </button>
 
-          <button
-            type="button"
-            className="nav-link-button"
-            onClick={() => {
-              if (opening) return;
-              if (colorDicingOpen) closeColorDicing();
-              if (minesOpen) closeMines();
-
-              if (casesPageOpen) {
-                closeCasesPage();
-              }
-
-              if (selected) {
-                closeCasePage();
-              }
-
-              requestAnimationFrame(() => {
-                document
-                  .getElementById("jackpot")
-                  ?.scrollIntoView({
-                    behavior: "smooth",
-                    block: "start",
-                  });
-              });
-            }}
-          >
-            Jackpot
-          </button>
 
           <button
             type="button"
@@ -6049,100 +7246,163 @@ useEffect(() => {
             Color Dicing
           </button>
 
-          <button
-            type="button"
-            className="nav-link-button mines-nav-link"
-            onClick={openMines}
+          
+
+ <div
+            className="nav-game-selector"
+            ref={gameMenuRef}
           >
-            Mines
-          </button>
+            <button
+              type="button"
+              className={`nav-link-button nav-game-button ${
+                gameMenuOpen ? "active" : ""
+              }`}
+              onClick={() => {
+                if (opening) return;
+                setProfileOpen(false);
+                setOriginalsMenuOpen(false);
+                setGameMenuOpen((current) => !current);
+              }}
+              aria-label="Open games"
+              aria-expanded={gameMenuOpen}
+            >
+              Games
+              <span className="nav-game-chevron">▾</span>
+            </button>
 
-          <button
-            type="button"
-            className="nav-link-button"
-            onClick={() => {
-              if (opening) return;
-              if (colorDicingOpen) closeColorDicing();
-              if (minesOpen) closeMines();
+            {gameMenuOpen && (
+              <div
+                className="nav-game-dropdown"
+                role="menu"
+                aria-label="Games"
+              >
+                <div className="nav-game-dropdown-title">GAMES</div>
 
-              if (casesPageOpen) {
-                closeCasesPage();
-              }
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setGameMenuOpen(false);
+                    openGamePortal("steal-a-brainrot", "marketplace");
+                  }}
+                >
+                  <span className="nav-game-dropdown-icon brainrot">🧠</span>
+                  <span>
+                    <strong>Steal a Brainrot</strong>
+                    <small>Live · Marketplace · Cases</small>
+                  </span>
+                  <b>→</b>
+                </button>
 
-              if (selected) {
-                closeCasePage();
-              }
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setGameMenuOpen(false);
+                    openGamePortal("donutsmp", "marketplace");
+                  }}
+                >
+                  <span className="nav-game-dropdown-icon donutsmp">🍩</span>
+                  <span>
+                    <strong>DonutSMP</strong>
+                    <small>Live · Marketplace · Cases</small>
+                  </span>
+                  <b>→</b>
+                </button>
+              </div>
+            )}
+          </div>
 
-              requestAnimationFrame(() => {
-                document
-                  .getElementById("cases")
-                  ?.scrollIntoView({
-                    behavior: "smooth",
-                    block: "start",
-                  });
-              });
-            }}
+          <div
+            className="nav-game-selector"
+            ref={originalsMenuRef}
           >
-            Cases
-          </button>
+            <button
+              type="button"
+              className={`nav-link-button nav-game-button ${
+                originalsMenuOpen ? "active" : ""
+              }`}
+              onClick={() => {
+                if (opening) return;
+                setProfileOpen(false);
+                setGameMenuOpen(false);
+                setOriginalsMenuOpen((current) => !current);
+              }}
+              aria-label="Open Originals"
+              aria-expanded={originalsMenuOpen}
+            >
+              Originals
+              <span className="nav-game-chevron">▾</span>
+            </button>
 
-          <button
-            type="button"
-            className="nav-link-button"
-            onClick={() => {
-              if (opening) return;
-              if (colorDicingOpen) closeColorDicing();
-              if (minesOpen) closeMines();
-              if (casesPageOpen) closeCasesPage();
-              if (selected) closeCasePage();
-              requestAnimationFrame(() => {
-                document
-                  .getElementById("inventory")
-                  ?.scrollIntoView({ behavior: "smooth", block: "start" });
-              });
-            }}
-          >
-            Inventory
-          </button>
+            {originalsMenuOpen && (
+              <div
+                className="nav-game-dropdown nav-originals-dropdown"
+                role="menu"
+                aria-label="Originals"
+              >
+                <div className="nav-game-dropdown-title">ORIGINALS</div>
 
-          <button
-            type="button"
-            className="nav-link-button"
-            onClick={() => {
-              if (opening) return;
-              if (colorDicingOpen) closeColorDicing();
-              if (minesOpen) closeMines();
-              if (casesPageOpen) closeCasesPage();
-              if (selected) closeCasePage();
-              requestAnimationFrame(() => {
-                document
-                  .getElementById("how")
-                  ?.scrollIntoView({ behavior: "smooth", block: "start" });
-              });
-            }}
-          >
-            How it works
-          </button>
+                <button type="button" role="menuitem" className="nav-original-game" onClick={() => openOriginalGame("towers")}>
+                  <span className="nav-game-dropdown-icon towers">🎯</span>
+                  <span><strong>Towers</strong><small>Play now</small></span>
+                  <b>→</b>
+                </button>
 
-          <button
-            type="button"
-            className="nav-link-button"
-            onClick={() => {
-              if (opening) return;
-              if (colorDicingOpen) closeColorDicing();
-              if (minesOpen) closeMines();
-              if (casesPageOpen) closeCasesPage();
-              if (selected) closeCasePage();
-              requestAnimationFrame(() => {
-                document
-                  .getElementById("faq")
-                  ?.scrollIntoView({ behavior: "smooth", block: "start" });
-              });
-            }}
-          >
-            FAQ
-          </button>
+                <button type="button" role="menuitem" className="nav-original-game" onClick={() => openOriginalGame("plinko")}>
+                  <span className="nav-game-dropdown-icon plinko">🔺</span>
+                  <span><strong>Plinko</strong><small>Play now</small></span>
+                  <b>→</b>
+                </button>
+
+                <button type="button" role="menuitem" className="nav-original-game" onClick={() => openOriginalGame("chicken")}>
+                  <span className="nav-game-dropdown-icon chicken-road">🛣️</span>
+                  <span><strong>Chicken Road</strong><small>Play now</small></span>
+                  <b>→</b>
+                </button>
+
+                <button type="button" role="menuitem" className="nav-original-game" onClick={() => openOriginalGame("coinflip")}>
+                  <span className="nav-game-dropdown-icon coinflip">🪙</span>
+                  <span><strong>Coinflip</strong><small>Play now</small></span>
+                  <b>→</b>
+                </button>
+
+                <button type="button" role="menuitem" className="nav-original-game" onClick={() => openOriginalGame("mines")}>
+                  <span className="nav-game-dropdown-icon mines">💣</span>
+                  <span><strong>Mines</strong><small>Play now</small></span>
+                  <b>→</b>
+                </button>
+              </div>
+            )}
+          </div>
+
+
+          
+
+          
         </nav>
+
+        <button
+          type="button"
+          className="casex-d4-balance-center"
+          onClick={() => {
+            if (authUser) {
+              setWalletOpen(true);
+              setWalletTab("wallet");
+              setWalletAction("deposit");
+            } else {
+              openAuth("login");
+            }
+          }}
+          aria-label={authUser ? "Open wallet" : "Sign in"}
+        >
+          <span className="casex-d4-balance-icon">💰</span>
+          <span className="casex-d4-balance-copy">
+            <small>Balance</small>
+            <strong>{authUser ? `$${balance.toFixed(2)}` : "Sign in"}</strong>
+          </span>
+          <span className="casex-d4-balance-plus">+</span>
+        </button>
 
 <div className="nav-actions">
   <a
@@ -6544,43 +7804,407 @@ useEffect(() => {
         </div>
       </header>
 
-      {colorDicingOpen && (
-        <div className="color-dicing-page-wrap">
-          <button
-            type="button"
-            className="color-dicing-back"
-            onClick={closeColorDicing}
-          >
-            ← Back to CASEX
-          </button>
+      {originalGameOpen && (
+        <div
+          className={`casex-d4-original-game-stage ${
+            d4SidebarOpen ? "sidebar-open" : "sidebar-collapsed"
+          }`}
+        >
+          {originalGameOpen === "dicing" ? (
+            <div className="original-games-overlay casex-d4-dicing-overlay">
+              <div className="original-games-game-tabs casex-d4-dicing-tabs">
+                <button type="button" className="active" onClick={openColorDicing}>
+                  <span>🎲</span>
+                  <strong>Color Dicing</strong>
+                </button>
+                <button type="button" onClick={() => openOriginalGame("mines")}>
+                  <span>💣</span>
+                  <strong>Mines</strong>
+                </button>
+                <button type="button" onClick={() => openOriginalGame("towers")}>
+                  <span>🎯</span>
+                  <strong>Towers</strong>
+                </button>
+                <button type="button" onClick={() => openOriginalGame("plinko")}>
+                  <span>🔺</span>
+                  <strong>Plinko</strong>
+                </button>
+                <button type="button" onClick={() => openOriginalGame("chicken")}>
+                  <span>🐔</span>
+                  <strong>Chicken Road</strong>
+                </button>
+                <button type="button" onClick={() => openOriginalGame("coinflip")}>
+                  <span>🪙</span>
+                  <strong>Coinflip</strong>
+                </button>
+              </div>
 
-          <ColorDicingGame
-            authUser={authUser}
-            openAuth={openAuth}
-            onBalanceChange={setBalance}
-          />
+              <div className="casex-d4-dicing-content">
+                <ColorDicingGame
+                  authUser={authUser}
+                  balance={balance}
+                  openAuth={openAuth}
+                  onBalanceChange={setBalance}
+                />
+              </div>
+            </div>
+          ) : (
+            <OriginalGames
+              game={originalGameOpen}
+              authUser={authUser}
+              balance={balance}
+              onBalanceChange={setBalance}
+              onClose={closeOriginalGame}
+              openAuth={openAuth}
+              soundEnabled={soundEnabled}
+              onOpenColorDicing={openColorDicing}
+            />
+          )}
         </div>
       )}
 
-      {minesOpen && (
-        <div className="mines-page-wrap">
-          <button
-            type="button"
-            className="mines-back"
-            onClick={closeMines}
-          >
-            ← Back to CASEX
-          </button>
-          <MinesGame
-            authUser={authUser}
-            openAuth={openAuth}
-            onBalanceChange={setBalance}
-            soundEnabled={soundEnabled}
-          />
-        </div>
-      )}
+      <style>{`
+        /* ============================================================
+           CASEX ORIGINAL GAMES — ONE SHARED RIGHT-SIDE SCROLLBAR
+           The fixed game stage is the only vertical scroll owner.
+           Color Dicing and every Original Game therefore use the same
+           page scrollbar instead of each game creating its own.
+           ============================================================ */
+        .casex-d4-original-game-stage .original-games-overlay{
+          position:relative !important;
+          inset:auto !important;
+          top:auto !important;
+          right:auto !important;
+          bottom:auto !important;
+          left:auto !important;
+          width:100% !important;
+          min-width:0 !important;
+          min-height:100% !important;
+          height:auto !important;
+          margin:0 !important;
+          padding:0 !important;
+          overflow:visible !important;
+          box-sizing:border-box !important;
+          background:transparent !important;
+        }
 
-      <main id="home" style={{ display: colorDicingOpen || minesOpen ? "none" : undefined }}>
+        .casex-d4-original-game-stage{
+          overflow-y:auto !important;
+          overflow-x:hidden !important;
+          scrollbar-width:thin !important;
+          scrollbar-color:rgba(157,108,255,.48) transparent !important;
+        }
+
+        .casex-d4-original-game-stage::-webkit-scrollbar{
+          width:8px !important;
+        }
+
+        .casex-d4-original-game-stage::-webkit-scrollbar-track{
+          background:transparent !important;
+        }
+
+        .casex-d4-original-game-stage::-webkit-scrollbar-thumb{
+          background:linear-gradient(180deg,rgba(157,108,255,.62),rgba(112,66,210,.48)) !important;
+          border:2px solid transparent !important;
+          background-clip:padding-box !important;
+          border-radius:999px !important;
+        }
+
+        .casex-d4-original-game-stage::-webkit-scrollbar-thumb:hover{
+          background:linear-gradient(180deg,rgba(173,122,255,.78),rgba(125,75,226,.66)) !important;
+          border:2px solid transparent !important;
+          background-clip:padding-box !important;
+        }
+
+        /* No Originals child gets its own page-sized scrollbar. */
+        .casex-d4-original-game-stage .original-games-page,
+        .casex-d4-original-game-stage .original-games-shell{
+          overflow:visible !important;
+        }
+      `}</style>
+
+      <GamePortal
+        open={gamePortalOpen}
+        initialGame={gamePortalGame}
+        initialTab={gamePortalTab}
+        authUser={authUser}
+        balance={balance}
+        inventory={inventory}
+        onClose={closeGamePortal}
+        onOpenCase={openCaseFromGamePortal}
+        onRefreshInventory={loadInventory}
+        onBalanceChange={setBalance}
+        openAuth={openAuth}
+      />
+
+      {/* GLOBAL CASEX SIDEBAR
+          This lives outside the homepage <main> so it remains mounted on
+          Game Portal, Original Games, Color Dicing, Marketplace, Cases,
+          Inventory and every other full-screen surface. */}
+      <aside
+        className={`casex-d4-sidebar casex-d4-global-sidebar ${
+          d4SidebarOpen ? "is-open" : "is-closed"
+        } ${originalGameOpen ? "is-original-game" : ""}`}
+        aria-label="CASEX navigation"
+      >
+        {d4SidebarOpen && (
+          <div className="casex-d4-sidebar-head">
+            <div className="casex-d4-sidebar-logo">✦</div>
+            <div>
+              <strong>CASEX</strong>
+              <small>PLAY HUB</small>
+            </div>
+          </div>
+        )}
+
+        <div className="casex-d4-side-label">PLAY</div>
+
+        <button
+          type="button"
+          className={`casex-d4-side-link ${gamePortalOpen ? "active" : ""}`}
+          onClick={() => {
+            if (opening) return;
+            closeOriginalGame();
+            setD4SidebarSection("games");
+            openGamePortal(null, "marketplace");
+          }}
+        >
+          <span>◫</span> Games
+        </button>
+
+        <div className="casex-d4-side-label">MAIN</div>
+
+        <button
+          type="button"
+          className={`casex-d4-side-link ${d4SidebarSection === "home" && !gamePortalOpen && !originalGameOpen ? "active" : ""}`}
+          onClick={() => {
+            closeGamePortal();
+            closeOriginalGame();
+            setD4SidebarSection("home");
+            window.scrollTo({ top: 0, behavior: "smooth" });
+          }}
+        >
+          <span>⌂</span> Home
+        </button>
+
+        <button
+          type="button"
+          className={`casex-d4-side-link ${d4SidebarSection === "originals" && !originalGameOpen ? "active" : ""}`}
+          onClick={() => {
+            closeGamePortal();
+            closeOriginalGame();
+            setD4SidebarSection("originals");
+            window.setTimeout(() => {
+              document.getElementById("original-games")?.scrollIntoView({
+                behavior: "smooth",
+                block: "start",
+              });
+            }, 40);
+          }}
+        >
+          <span>◈</span> Originals
+        </button>
+
+        <button
+          type="button"
+          className={`casex-d4-side-link ${d4SidebarSection === "marketplace" && !gamePortalOpen ? "active" : ""}`}
+          onClick={() => {
+            closeGamePortal();
+            closeOriginalGame();
+            setD4SidebarSection("marketplace");
+            window.setTimeout(() => {
+              const marketplaceSection = document.getElementById("marketplace");
+              if (!marketplaceSection) return;
+
+              // The topbar is fixed, so scroll the Marketplace section slightly
+              // below it instead of placing the section underneath the header.
+              const nav = document.querySelector(".casex-design4-nav");
+              const navHeight = nav?.getBoundingClientRect?.().height || 74;
+              const topGap = 16;
+              const targetTop =
+                marketplaceSection.getBoundingClientRect().top +
+                window.scrollY -
+                navHeight -
+                topGap;
+
+              window.scrollTo({
+                top: Math.max(0, targetTop),
+                left: 0,
+                behavior: "smooth",
+              });
+            }, 40);
+          }}
+        >
+          <span>◉</span> Marketplace
+        </button>
+
+        <button
+          type="button"
+          className={`casex-d4-side-link ${d4SidebarSection === "cases" && !gamePortalOpen ? "active" : ""}`}
+          onClick={() => {
+            closeGamePortal();
+            closeOriginalGame();
+            setD4SidebarSection("cases");
+            window.setTimeout(() => {
+              document.getElementById("cases")?.scrollIntoView({
+                behavior: "smooth",
+                block: "start",
+              });
+            }, 40);
+          }}
+        >
+          <span>▣</span> Cases
+        </button>
+
+        <div className="casex-d4-side-label">ORIGINAL GAMES</div>
+
+        <button
+          type="button"
+          className={`casex-d4-side-game dicing ${originalGameOpen === "dicing" ? "active" : ""}`}
+          onClick={openColorDicing}
+        >
+          <span className="casex-d4-side-game-icon">🎲</span><span>Color Dicing</span>
+        </button>
+
+        <button
+          type="button"
+          className={`casex-d4-side-game mines ${originalGameOpen === "mines" ? "active" : ""}`}
+          onClick={openMines}
+        >
+          <span className="casex-d4-side-game-icon">💣</span><span>Mines</span>
+        </button>
+
+        <button
+          type="button"
+          className={`casex-d4-side-game towers ${originalGameOpen === "towers" ? "active" : ""}`}
+          onClick={() => {
+            closeGamePortal();
+            openOriginalGame("towers");
+          }}
+        >
+          <span className="casex-d4-side-game-icon">🎯</span><span>Towers</span>
+        </button>
+
+        <button
+          type="button"
+          className={`casex-d4-side-game plinko ${originalGameOpen === "plinko" ? "active" : ""}`}
+          onClick={() => {
+            closeGamePortal();
+            openOriginalGame("plinko");
+          }}
+        >
+          <span className="casex-d4-side-game-icon">🔺</span><span>Plinko</span>
+        </button>
+
+        <button
+          type="button"
+          className={`casex-d4-side-game chicken ${originalGameOpen === "chicken" ? "active" : ""}`}
+          onClick={() => {
+            closeGamePortal();
+            openOriginalGame("chicken");
+          }}
+        >
+          <span className="casex-d4-side-game-icon">🐔</span><span>Chicken Road</span>
+        </button>
+
+        <button
+          type="button"
+          className={`casex-d4-side-game coinflip ${originalGameOpen === "coinflip" ? "active" : ""}`}
+          onClick={() => {
+            closeGamePortal();
+            openOriginalGame("coinflip");
+          }}
+        >
+          <span className="casex-d4-side-game-icon">🪙</span><span>Coinflip</span>
+        </button>
+
+        <div className="casex-d4-sidebar-spacer"></div>
+
+        <div className="casex-d4-sidebar-promo">
+          <span className="casex-d4-promo-icon">ϟ</span>
+          <div><strong>DAILY REWARDS</strong><small>Play more. Earn more.</small></div>
+        </div>
+      </aside>
+
+      <style>{`
+        /* ============================================================
+           CASEX GLOBAL SIDEBAR — ALWAYS MOUNTED + FIXED
+           The sidebar is outside <main>, so hiding a page/overlay can
+           never remove the navigation.
+           ============================================================ */
+        .casex-d4-global-sidebar{
+          position:fixed !important;
+          left:0 !important;
+          top:74px !important;
+          bottom:0 !important;
+          width:236px !important;
+          height:auto !important;
+          margin:0 !important;
+          box-sizing:border-box !important;
+          overflow-y:auto !important;
+          overflow-x:hidden !important;
+          z-index:11000 !important;
+          transform:translateX(0) !important;
+          opacity:1 !important;
+          pointer-events:auto !important;
+          display:flex !important;
+          flex-direction:column !important;
+        }
+
+        .casex-d4-global-sidebar.is-closed{
+          width:64px !important;
+          transform:translateX(-102%) !important;
+          pointer-events:none !important;
+        }
+
+        .casex-d4-global-sidebar.is-open{
+          transform:translateX(0) !important;
+          pointer-events:auto !important;
+        }
+
+        /* Game Portal is a full-screen overlay. Reserve the fixed sidebar
+           so its content never renders underneath the navigation. */
+        body.casex-global-sidebar-open .game-portal-overlay{
+          padding-left:236px !important;
+          box-sizing:border-box !important;
+        }
+
+        body.casex-global-sidebar-closed .game-portal-overlay{
+          padding-left:64px !important;
+          box-sizing:border-box !important;
+        }
+
+        /* Keep Original Games and Color Dicing aligned with the same
+           fixed navigation width. */
+        body.casex-global-sidebar-open .casex-d4-original-game-stage{
+          margin-left:0 !important;
+        }
+
+        @media(max-width:700px){
+          .casex-d4-global-sidebar{
+            position:fixed !important;
+            top:68px !important;
+            bottom:0 !important;
+            width:184px !important;
+            height:auto !important;
+          }
+
+          .casex-d4-global-sidebar.is-closed{
+            width:64px !important;
+          }
+
+          body.casex-global-sidebar-open .game-portal-overlay{
+            padding-left:184px !important;
+          }
+
+          body.casex-global-sidebar-closed .game-portal-overlay{
+            padding-left:64px !important;
+          }
+        }
+      `}</style>
+
+      <main id="home" className={`homepage-redesign casex-design4-main ${jackpotPageOpen ? "jackpot-page-root" : ""} ${d4SidebarOpen ? "casex-d4-sidebar-open" : "casex-d4-sidebar-closed"}`} style={{ display: originalGameOpen || colorDicingOpen ? "none" : undefined }}>
+        <div className="casex-d4-content">
         <section className="hero">
           <div className="hero-glow"></div>
 
@@ -6590,22 +8214,21 @@ useEffect(() => {
             </div>
 
             <h1>
-              Open cases.
+              Original games.
               <br />
-              <span>Chase the rare.</span>
+              <span>Built different.</span>
             </h1>
 
             <p>
-              Pick a case, reveal a random reward,
-              and build your collection. Fast, simple
-              and transparent.
+              Fast, fair originals built for quick games.
+              Pick a game, place your bet and play.
             </p>
 
             <a
               className="primary hero-cta"
-              href="#cases"
+              href="#original-games"
             >
-              <span>Explore Cases</span>
+              <span>Explore Games</span>
               <span>→</span>
             </a>
 
@@ -6681,739 +8304,205 @@ useEffect(() => {
               <b>LEGENDARY</b>
               <em>2.7% CHANCE</em>
             </div>
+
+            <div className="hero-live-wins">
+              <div className="hero-live-wins-head">
+                <span><i></i> LIVE WINS</span>
+                <small>Updating</small>
+              </div>
+              {(liveActivity.slice(0, 3)).map((item, index) => (
+                <div className="hero-live-win" key={`hero-live-${item.id}-${index}`}>
+                  <span className="hero-live-win-art">
+                    <ItemArt rarity={item.rarity} imageUrl={item.image_url || item.imageUrl} compact />
+                  </span>
+                  <div>
+                    <strong>{item.username || "Player"}</strong>
+                    <small>won {item.itemName || "Rare Item"}</small>
+                  </div>
+                  <b>${(Number(item.valueCents || 0) / 100).toFixed(2)}</b>
+                </div>
+              ))}
+              {!liveActivity.length && (
+                <div className="hero-live-empty">Waiting for the next big win...</div>
+              )}
+            </div>
           </div>
         </section>
 
-        {/* =========================================================
-           DAILY JACKPOT — LIVE
-           ========================================================= */}
-        <section id="jackpot" className="section jackpot-live-section">
-          <style>{`
-            .jackpot-live-section{
-              padding:36px 0 54px;
-            }
-            .jackpot-live-shell{
-              max-width:1120px;
-              margin:0 auto;
-              border:1px solid rgba(126,82,190,.42);
-              border-radius:24px;
-              overflow:hidden;
-              background:
-                radial-gradient(circle at 78% 0%, rgba(144,91,255,.16), transparent 34%),
-                linear-gradient(135deg,#101019,#08090f 74%);
-              box-shadow:0 24px 90px rgba(39,16,70,.26), inset 0 1px 0 rgba(255,255,255,.035);
-            }
-            .jackpot-live-header{
-              display:flex;
-              align-items:center;
-              justify-content:space-between;
-              gap:24px;
-              padding:28px 30px 24px;
-              border-bottom:1px solid rgba(255,255,255,.055);
-            }
-            .jackpot-live-kicker{
-              display:flex;
-              align-items:center;
-              gap:8px;
-              color:#9e7bcd;
-              font-size:9px;
-              font-weight:900;
-              letter-spacing:.14em;
-            }
-            .jackpot-live-dot{
-              width:7px;
-              height:7px;
-              border-radius:50%;
-              background:#7de4ad;
-              box-shadow:0 0 14px rgba(125,228,173,.75);
-            }
-            .jackpot-live-title{
-              margin:10px 0 6px;
-              color:#f6f2fb;
-              font-size:38px;
-              line-height:1;
-              letter-spacing:-.04em;
-            }
-            .jackpot-live-subtitle{
-              margin:0;
-              max-width:720px;
-              color:#858896;
-              font-size:12px;
-              font-weight:600;
-              line-height:1.55;
-            }
-            .jackpot-live-countdown{
-              min-width:210px;
-              padding:14px 16px;
-              border:1px solid rgba(134,91,188,.45);
-              border-radius:14px;
-              background:rgba(23,16,34,.72);
-              text-align:right;
-            }
-            .jackpot-live-countdown small{
-              display:block;
-              color:#747684;
-              font-size:8px;
-              font-weight:900;
-              letter-spacing:.13em;
-            }
-            .jackpot-live-countdown strong{
-              display:block;
-              margin-top:7px;
-              color:#c5a0ff;
-              font-size:21px;
-              letter-spacing:.02em;
-            }
-            .jackpot-live-main{
-              display:grid;
-              grid-template-columns:278px minmax(0,1fr);
-              min-height:525px;
-            }
-            .jackpot-live-sidebar{
-              padding:22px 16px 22px 18px;
-              border-right:1px solid rgba(255,255,255,.055);
-              background:rgba(6,7,12,.42);
-            }
-            .jackpot-live-sidebar-head{
-              display:flex;
-              align-items:center;
-              justify-content:space-between;
-              gap:12px;
-              margin-bottom:14px;
-            }
-            .jackpot-live-sidebar-head strong{
-              color:#f3eef9;
-              font-size:12px;
-              letter-spacing:.06em;
-            }
-            .jackpot-live-sidebar-head span{
-              color:#6f7180;
-              font-size:9px;
-              font-weight:800;
-            }
-            .jackpot-live-player-list{
-              display:flex;
-              flex-direction:column;
-              gap:8px;
-              max-height:470px;
-              overflow:auto;
-              padding-right:3px;
-            }
-            .jackpot-live-player{
-              display:grid;
-              grid-template-columns:34px minmax(0,1fr) auto;
-              align-items:center;
-              gap:10px;
-              padding:10px 10px;
-              border:1px solid rgba(255,255,255,.05);
-              border-radius:12px;
-              background:rgba(23,25,35,.7);
-            }
-            .jackpot-live-player.me{
-              border-color:rgba(164,117,239,.48);
-              background:linear-gradient(135deg,rgba(86,49,126,.32),rgba(22,23,32,.76));
-              box-shadow:inset 0 0 0 1px rgba(184,143,255,.05);
-            }
-            .jackpot-live-avatar{
-              width:34px;
-              height:34px;
-              display:grid;
-              place-items:center;
-              border-radius:10px;
-              background:linear-gradient(145deg,#8251dc,#302041);
-              color:#fff;
-              font-size:13px;
-              font-weight:900;
-            }
-            .jackpot-live-player-copy{
-              min-width:0;
-            }
-            .jackpot-live-player-copy strong{
-              display:block;
-              overflow:hidden;
-              color:#ece8f3;
-              font-size:11px;
-              font-weight:800;
-              text-overflow:ellipsis;
-              white-space:nowrap;
-            }
-            .jackpot-live-player-copy span{
-              display:block;
-              margin-top:3px;
-              color:#696d7a;
-              font-size:8px;
-              font-weight:800;
-            }
-            .jackpot-live-player-odds{
-              text-align:right;
-            }
-            .jackpot-live-player-odds strong{
-              display:block;
-              color:#8fe28f;
-              font-size:11px;
-              font-weight:900;
-            }
-            .jackpot-live-player-odds span{
-              display:block;
-              margin-top:3px;
-              color:#737684;
-              font-size:8px;
-              font-weight:800;
-            }
-            .jackpot-live-stage{
-              min-width:0;
-              position:relative;
-              display:flex;
-              flex-direction:column;
-              align-items:center;
-              justify-content:center;
-              padding:24px 28px 26px;
-              overflow:hidden;
-            }
-            .jackpot-live-stage:before{
-              content:"";
-              position:absolute;
-              inset:0;
-              background:
-                radial-gradient(circle at 50% 48%,rgba(140,85,255,.12),transparent 26%),
-                radial-gradient(circle at 50% 100%,rgba(86,46,140,.13),transparent 42%);
-              pointer-events:none;
-            }
-            .jackpot-live-pot-label{
-              position:relative;
-              z-index:2;
-              color:#7e7f8d;
-              font-size:9px;
-              font-weight:900;
-              letter-spacing:.16em;
-            }
-            .jackpot-live-pot{
-              position:relative;
-              z-index:2;
-              margin-top:5px;
-              color:#f3c85b;
-              font-size:40px;
-              line-height:1;
-              font-weight:950;
-              letter-spacing:-.045em;
-              text-shadow:0 0 24px rgba(243,200,91,.16);
-            }
-            .jackpot-live-wheel-wrap{
-              position:relative;
-              z-index:2;
-              width:min(100%,500px);
-              height:auto;
-              min-height:410px;
-              margin-top:16px;
-              display:flex;
-              align-items:center;
-              justify-content:center;
-              overflow:visible;
-            }
-            .jackpot-live-pointer{
-              position:absolute;
-              z-index:8;
-              top:14px;
-              left:50%;
-              width:0;
-              height:0;
-              transform:translateX(-50%);
-              border-left:12px solid transparent;
-              border-right:12px solid transparent;
-              border-top:25px solid #f3cb63;
-              filter:drop-shadow(0 0 10px rgba(243,203,99,.42));
-            }
-            .jackpot-wheel-modern{
-              position:relative;
-              width:min(100%,460px);
-              aspect-ratio:1/1;
-              display:grid;
-              place-items:center;
-              isolation:isolate;
-              filter:drop-shadow(0 28px 42px rgba(0,0,0,.38));
-            }
-            .jackpot-wheel-modern:before{
-              content:"";
-              position:absolute;
-              inset:7%;
-              border-radius:50%;
-              border:1px solid rgba(211,186,255,.12);
-              box-shadow:
-                0 0 0 1px rgba(122,77,184,.08),
-                0 0 42px rgba(126,72,220,.13),
-                inset 0 0 34px rgba(0,0,0,.35);
-              pointer-events:none;
-              z-index:1;
-            }
-            .jackpot-wheel-modern-glow{
-              position:absolute;
-              width:84%;
-              height:84%;
-              border-radius:50%;
-              background:
-                radial-gradient(circle,rgba(150,91,255,.24),transparent 51%),
-                radial-gradient(circle,rgba(103,72,184,.12),transparent 72%);
-              filter:blur(30px);
-              pointer-events:none;
-            }
-            .jackpot-wheel-modern-svg{
-              position:relative;
-              z-index:3;
-              width:100%;
-              height:100%;
-              overflow:visible;
-            }
-            .jackpot-wheel-modern.empty .jackpot-wheel-modern-svg{
-              opacity:.88;
-            }
-            .jackpot-live-wheel-label{
-              display:none;
-            }
-            .jackpot-live-actions{
-              position:relative;
-              z-index:3;
-              display:grid;
-              grid-template-columns:1.15fr 1fr;
-              gap:10px;
-              width:min(100%,540px);
-              margin-top:14px;
-            }
-            .jackpot-live-action{
-              min-height:50px;
-              border:1px solid rgba(155,111,216,.50);
-              border-radius:13px;
-              background:linear-gradient(100deg,#3a234f,#21172e);
-              color:#eee9f5;
-              font-size:12px;
-              font-weight:900;
-              cursor:pointer;
-              transition:transform .16s ease,filter .16s ease,border-color .16s ease;
-            }
-            .jackpot-live-action.primary{
-              border-color:#a57aef;
-              background:linear-gradient(100deg,#7543d8,#a36dfc);
-              box-shadow:0 14px 34px rgba(121,72,220,.24);
-            }
-            .jackpot-live-action:hover{
-              transform:translateY(-1px);
-              filter:brightness(1.06);
-            }
-            .jackpot-live-my{
-              position:relative;
-              z-index:3;
-              margin-top:12px;
-              color:#777985;
-              font-size:9px;
-              font-weight:800;
-              text-align:center;
-            }
-            .jackpot-live-my b{
-              color:#b895ef;
-            }
-            .jackpot-live-empty{
-              padding:30px 12px;
-              text-align:center;
-              color:#6e7180;
-              font-size:10px;
-              font-weight:700;
-            }
-            .jackpot-live-entry-backdrop{
-              position:fixed;
-              inset:0;
-              z-index:2200;
-              display:flex;
-              align-items:center;
-              justify-content:center;
-              padding:20px;
-              background:rgba(4,5,9,.76);
-              backdrop-filter:blur(10px);
-            }
-            .jackpot-live-entry-modal{
-              position:relative;
-              width:min(100%,540px);
-              max-height:min(86vh,760px);
-              overflow:auto;
-              padding:26px;
-              border:1px solid rgba(151,104,221,.5);
-              border-radius:20px;
-              background:linear-gradient(145deg,#171320,#090a10);
-              box-shadow:0 30px 100px rgba(0,0,0,.55);
-            }
-            .jackpot-live-entry-close{
-              position:absolute;
-              top:14px;
-              right:16px;
-              width:34px;
-              height:34px;
-              border:1px solid rgba(255,255,255,.09);
-              border-radius:10px;
-              background:rgba(255,255,255,.025);
-              color:#8b8c99;
-              font-size:20px;
-              cursor:pointer;
-            }
-            .jackpot-live-entry-close:hover{
-              color:#fff;
-              background:rgba(255,255,255,.06);
-            }
-            .jackpot-live-entry-modal h2{
-              margin:8px 0 7px;
-              color:#f5f1fa;
-              font-size:28px;
-            }
-            .jackpot-live-entry-modal>p{
-              margin:0;
-              color:#828592;
-              font-size:11px;
-              line-height:1.55;
-            }
-            .jackpot-live-mode{
-              display:grid;
-              grid-template-columns:1.15fr 1fr;
-              gap:8px;
-              margin:20px 0 16px;
-            }
-            .jackpot-live-mode button{
-              min-height:44px;
-              border:1px solid rgba(255,255,255,.08);
-              border-radius:11px;
-              background:#11131b;
-              color:#848795;
-              font-size:10px;
-              font-weight:900;
-              cursor:pointer;
-            }
-            .jackpot-live-mode button.active{
-              border-color:rgba(161,119,235,.6);
-              background:rgba(108,68,158,.2);
-              color:#d4b8ff;
-            }
-            .jackpot-live-field{
-              display:block;
-              margin-top:8px;
-            }
-            .jackpot-live-field span{
-              display:block;
-              margin-bottom:7px;
-              color:#838592;
-              font-size:9px;
-              font-weight:900;
-              letter-spacing:.08em;
-            }
-            .jackpot-live-field input{
-              width:100%;
-              height:48px;
-              border:1px solid rgba(255,255,255,.09);
-              border-radius:11px;
-              padding:0 13px;
-              background:#0d0f16;
-              color:#f4f2f7;
-              font-size:15px;
-              font-weight:800;
-              outline:none;
-            }
-            .jackpot-live-field input:focus{
-              border-color:rgba(162,120,234,.65);
-              box-shadow:0 0 0 3px rgba(142,90,229,.12);
-            }
-            .jackpot-live-selection-head{
-              display:flex;
-              align-items:center;
-              justify-content:space-between;
-              gap:10px;
-              margin:12px 0 9px;
-            }
-            .jackpot-live-selection-head strong{
-              color:#ebe7f2;
-              font-size:10px;
-            }
-            .jackpot-live-selection-head span{
-              color:#b895ef;
-              font-size:10px;
-              font-weight:900;
-            }
-            .jackpot-live-brainrot-list{
-              display:grid;
-              grid-template-columns:1.15fr 1fr;
-              gap:8px;
-              max-height:360px;
-              overflow:auto;
-            }
-            .jackpot-live-brainrot{
-              display:flex;
-              align-items:center;
-              gap:9px;
-              padding:8px;
-              border:1px solid rgba(255,255,255,.07);
-              border-radius:11px;
-              background:#10121a;
-              cursor:pointer;
-              text-align:left;
-            }
-            .jackpot-live-brainrot.selected{
-              border-color:rgba(159,115,231,.62);
-              background:rgba(88,52,134,.22);
-            }
-            .jackpot-live-brainrot-art{
-              width:42px;
-              height:42px;
-              flex:0 0 42px;
-              display:grid;
-              place-items:center;
-              border-radius:9px;
-              border:1px solid rgba(255,255,255,.06);
-              background:#0a0c12;
-              overflow:hidden;
-            }
-            .jackpot-live-brainrot-copy{
-              min-width:0;
-            }
-            .jackpot-live-brainrot-copy strong{
-              display:block;
-              overflow:hidden;
-              color:#eeebf4;
-              font-size:9px;
-              font-weight:800;
-              text-overflow:ellipsis;
-              white-space:nowrap;
-            }
-            .jackpot-live-brainrot-copy span{
-              display:block;
-              margin-top:3px;
-              color:#8fe28f;
-              font-size:8px;
-              font-weight:900;
-            }
-            .jackpot-live-error{
-              margin-top:12px;
-              padding:10px 11px;
-              border:1px solid rgba(239,108,108,.26);
-              border-radius:10px;
-              background:rgba(130,32,38,.14);
-              color:#ffaaa9;
-              font-size:9px;
-              font-weight:800;
-            }
-            .jackpot-live-submit{
-              width:100%;
-              min-height:50px;
-              margin-top:14px;
-              border:1px solid #aa7bf6;
-              border-radius:11px;
-              background:linear-gradient(100deg,#7442d6,#a36dfc);
-              color:#fff;
-              font-size:11px;
-              font-weight:900;
-              cursor:pointer;
-            }
-            .jackpot-live-submit:disabled{
-              opacity:.55;
-              cursor:not-allowed;
-            }
-            @media(max-width:900px){
-              .jackpot-live-main{
-                grid-template-columns:1fr;
-              }
-              .jackpot-live-sidebar{
-                border-right:0;
-                border-bottom:1px solid rgba(255,255,255,.055);
-              }
-              .jackpot-live-player-list{
-                display:grid;
-                grid-template-columns:1.15fr 1fr;
-                max-height:280px;
-              }
-              .jackpot-live-stage{
-                min-height:560px;
-              }
-            }
-            @media(max-width:650px){
-              .jackpot-live-header{
-                flex-direction:column;
-                align-items:flex-start;
-                padding:22px 18px;
-              }
-              .jackpot-live-countdown{
-                width:100%;
-                min-width:0;
-                text-align:left;
-              }
-              .jackpot-live-title{
-                font-size:30px;
-              }
-              .jackpot-live-stage{
-                padding:22px 14px 26px;
-              }
-              .jackpot-live-pot{
-                font-size:34px;
-              }
-              .jackpot-live-wheel-wrap{
-                min-height:320px;
-              }
-              .jackpot-wheel-modern{
-                width:min(100%,380px);
-              }
-              .jackpot-live-actions{
-                grid-template-columns:1fr;
-                width:100%;
-              }
-              .jackpot-live-brainrot-list,
-              .jackpot-live-player-list{
-                grid-template-columns:1fr;
-              }
-            }
-          `}</style>
+        <section className="casex-brainrot-deposit-promo" aria-label="Deposit Brainrots">
+          <div className="casex-brainrot-deposit-copy">
+            <div className="casex-brainrot-deposit-kicker">STEAL A BRAINROT</div>
+            <h2>Got Brainrots? Turn them into CaseX balance.</h2>
+            <p>Check accepted Brainrots, see their current deposit value, and submit your items through Discord.</p>
+            <button type="button" className="casex-brainrot-deposit-cta" onClick={() => openGamePortal("steal-a-brainrot", "deposit")}>
+              <span>Deposit Brainrots</span>
+              <span>→</span>
+            </button>
+          </div>
 
-          <div className="jackpot-live-shell">
-            <div className="jackpot-live-header">
-              <div>
-                <div className="jackpot-live-kicker">
-                  <i className="jackpot-live-dot"></i>
-                  LIVE DAILY JACKPOT
-                </div>
-                <h2 className="jackpot-live-title">Daily Jackpot</h2>
-                <p className="jackpot-live-subtitle">
-                  Contribute from your CASEX balance or enter with Brainrots
-                  from your inventory. Your share of the pot determines your odds.
-                </p>
-              </div>
+          <div className="casex-brainrot-deposit-art" aria-hidden="true">
+            <div className="casex-brainrot-deposit-glow"></div>
+            <img src="/steal-a-brainrot-logo.png" alt="" draggable="false" />
+          </div>
+        </section>
 
-              <div className="jackpot-live-countdown">
-                <small>DRAW ENDS IN</small>
-                <strong>
-                  {jackpotData
-                    ? `${String(jackpotTimeLeft.days).padStart(2, "0")}d ${String(
-                        jackpotTimeLeft.hours
-                      ).padStart(2, "0")}h ${String(
-                        jackpotTimeLeft.minutes
-                      ).padStart(2, "0")}m ${String(
-                        jackpotTimeLeft.seconds
-                      ).padStart(2, "0")}s`
-                    : "Loading..."}
-                </strong>
-              </div>
+        <section id="original-games" className="casex-game-hub section">
+          <div className="casex-hub-heading">
+            <div>
+              <div className="eyebrow">⚡ FEATURED GAMES</div>
+              <h2>Jump into what's hot.</h2>
             </div>
+            <button
+              type="button"
+              className="home-section-link casex-hub-link"
+              onClick={() => openGamePortal("steal-a-brainrot", "marketplace")}
+            >
+              Explore games →
+            </button>
+          </div>
 
-            <div className="jackpot-live-main">
-              <aside className="jackpot-live-sidebar">
-                <div className="jackpot-live-sidebar-head">
-                  <strong>PLAYERS</strong>
-                  <span>
-                    {jackpotPlayers.length}{" "}
-                    {jackpotPlayers.length === 1 ? "player" : "players"}
-                  </span>
-                </div>
-
-                <div className="jackpot-live-player-list">
-                  {jackpotLoading && !jackpotPlayers.length ? (
-                    <div className="jackpot-live-empty">
-                      Loading live players...
-                    </div>
-                  ) : jackpotPlayers.length ? (
-                    jackpotPlayers.map((player) => {
-                      const username = String(
-                        player.username || "Player"
-                      );
-                      const isMe =
-                        Number(player.userId) === Number(authUser?.id);
-
-                      return (
-                        <div
-                          key={player.userId}
-                          className={`jackpot-live-player ${
-                            isMe ? "me" : ""
-                          }`}
-                        >
-                          <div className="jackpot-live-avatar">
-                            {username.charAt(0).toUpperCase()}
-                          </div>
-
-                          <div className="jackpot-live-player-copy">
-                            <strong>{username}</strong>
-                            <span>
-                              ${(
-                                Number(player.contributionCents || 0) /
-                                100
-                              ).toFixed(2)}
-                            </span>
-                          </div>
-
-                          <div className="jackpot-live-player-odds">
-                            <strong>
-                              {Number(player.odds || 0).toFixed(2)}%
-                            </strong>
-                            <span>
-                              {Number(player.contributionCount || 0)}{" "}
-                              {Number(player.contributionCount || 0) === 1
-                                ? "entry"
-                                : "entries"}
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <div className="jackpot-live-empty">
-                      No entries yet. Be the first player.
-                    </div>
-                  )}
-                </div>
-              </aside>
-
-              <div className="jackpot-live-stage">
-                <div className="jackpot-live-pot-label">
-                  JACKPOT VALUE
-                </div>
-
-                <div className="jackpot-live-pot">
-                  ${(jackpotPotCents / 100).toFixed(2)}
-                </div>
-
-                <div className="jackpot-live-wheel-wrap" aria-label="Jackpot wheel">
-                  <div className="jackpot-live-pointer"></div>
-
-                  <JackpotWheel
-                    players={jackpotPlayers}
-                    totalCents={jackpotPotCents}
-                  />
-                </div>
-
-                <div className="jackpot-live-actions">
-                  <button
-                    type="button"
-                    className="jackpot-live-action primary"
-                    onClick={() => openJackpotEntry("balance")}
-                  >
-                    💰 Enter with CASEX balance
-                  </button>
-
-                  <button
-                    type="button"
-                    className="jackpot-live-action"
-                    onClick={() => openJackpotEntry("brainrots")}
-                  >
-                    ◇ Enter with Brainrots
-                  </button>
-                </div>
-
-                <div className="jackpot-live-my">
-                  {authUser ? (
-                    <>
-                      Your contribution:{" "}
-                      <b>${(jackpotMyContributionCents / 100).toFixed(2)}</b>
-                      {" · "}
-                      Your odds:{" "}
-                      <b>{jackpotMyOdds.toFixed(2)}%</b>
-                    </>
-                  ) : (
-                    <>
-                      Sign in to enter the jackpot. Minimum contribution is{" "}
-                      <b>$0.10</b>.
-                    </>
-                  )}
-                </div>
+          <div className="casex-featured-games">
+            <button
+              type="button"
+              className="casex-feature-card sab"
+              onClick={() => openGamePortal("steal-a-brainrot", "marketplace")}
+            >
+              <div className="casex-feature-art">
+                <div className="casex-feature-glow"></div>
+                <img src="/steal-a-brainrot-logo.png" alt="Steal a Brainrot" draggable="false" />
               </div>
+              <div className="casex-feature-copy">
+                <strong>STEAL A BRAINROT</strong>
+                <span>Trade. Steal. Collect.</span>
+                <b>Play Now →</b>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              className="casex-feature-card donut"
+              onClick={() => openGamePortal("donutsmp", "marketplace")}
+            >
+              <div className="casex-feature-art">
+                <div className="casex-feature-glow"></div>
+                <img src="/donutsmp-logo-transparent.png" alt="DonutSMP" draggable="false" />
+              </div>
+              <div className="casex-feature-copy">
+                <strong>DONUTSMP</strong>
+                <span>Play. Earn. Upgrade.</span>
+                <b>Play Now →</b>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              className="casex-feature-card mines"
+              onClick={openMines}
+            >
+              <div className="casex-feature-art">
+                <div className="casex-feature-icon">💣</div>
+                <div className="casex-feature-glow"></div>
+              </div>
+              <div className="casex-feature-copy">
+                <strong>MINES</strong>
+                <span>Find the safe tiles.</span>
+                <b>Play Now →</b>
+              </div>
+            </button>
+          </div>
+
+          <div className="casex-all-games-heading">
+            <div>
+              <div className="eyebrow">🎮 ORIGINAL GAMES</div>
+              <h2>Built different.</h2>
             </div>
+          </div>
+
+          <div className="casex-all-games">
+            <button type="button" className="casex-mini-game dicing" onClick={openColorDicing}>
+              <span className="casex-mini-icon">🎲</span>
+              <strong>Color Dicing</strong>
+              <small>Roll and win</small>
+              <b>Play Now</b>
+            </button>
+
+            <button type="button" className="casex-mini-game mines" onClick={openMines}>
+              <span className="casex-mini-icon">💣</span>
+              <strong>Mines</strong>
+              <small>Find the safe tiles</small>
+              <b>Play Now</b>
+            </button>
+
+            <button type="button" className="casex-mini-game towers" onClick={() => openOriginalGame("towers")}>
+              <span className="casex-mini-icon">🎯</span>
+              <strong>Towers</strong>
+              <small>Climb higher</small>
+              <b>Play Now</b>
+            </button>
+
+            <button type="button" className="casex-mini-game plinko" onClick={() => openOriginalGame("plinko")}>
+              <span className="casex-mini-icon">🔺</span>
+              <strong>Plinko</strong>
+              <small>Drop and hope</small>
+              <b>Play Now</b>
+            </button>
+
+            <button type="button" className="casex-mini-game chicken" onClick={() => openOriginalGame("chicken")}>
+              <span className="casex-mini-icon">🐔</span>
+              <strong>Chicken Road</strong>
+              <small>Cross. Risk. Win.</small>
+              <b>Play Now</b>
+            </button>
+
+            <button type="button" className="casex-mini-game coinflip" onClick={() => openOriginalGame("coinflip")}>
+              <span className="casex-mini-icon">🪙</span>
+              <strong>Coinflip</strong>
+              <small>Pick your side</small>
+              <b>Play Now</b>
+            </button>
+          </div>
+        </section>
+
+        <section id="marketplace" className="home-feature-zone section">
+          <div className="home-feature-heading">
+            <div>
+              <div className="eyebrow">FEATURED NOW</div>
+              <h2>See what everyone is chasing.</h2>
+              <p>Live jackpot action and the items currently standing out in the marketplace.</p>
+            </div>
+          </div>
+
+          <div className="home-feature-grid">
+            <section className="home-trending-items home-trending-feature">
+              <div className="home-section-heading compact">
+                <div>
+                  <div className="eyebrow">TRENDING ITEMS</div>
+                  <h2>Popular right now</h2>
+                </div>
+                <button type="button" className="home-section-link" onClick={() => openGamePortal("steal-a-brainrot", "marketplace")}>View Marketplace →</button>
+              </div>
+
+              {homeTrendingLoading ? (
+                <div className="home-trending-empty">Loading marketplace highlights...</div>
+              ) : homeTrendingItems.length ? (
+                <div className="home-trending-grid home-trending-grid-feature">
+                  {homeTrendingItems.map((item) => (
+                    <button type="button" className="home-trending-card home-trending-card-feature" key={item.id} onClick={() => openGamePortal("steal-a-brainrot", "marketplace")}>
+                      <div className="home-trending-art">
+                        <ItemArt rarity={item.rarity} imageUrl={item.imageUrl || item.image_url} />
+                      </div>
+                      <div className="home-trending-card-copy">
+                        <strong>{item.name || "Featured Item"}</strong>
+                        <small>{item.rarity || "Common"}</small>
+                        <span>${(Number(item.priceCents || 0) / 100).toFixed(2)}</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="home-trending-empty">No marketplace highlights available right now.</div>
+              )}
+            </section>
           </div>
         </section>
 
@@ -7620,6 +8709,11 @@ useEffect(() => {
                       <button key={tag} type="button" className={casesTagFilter === tag ? "active" : ""} onClick={() => setCasesTagFilter(tag)}>{tag}</button>
                     ))}
                   </div>
+                  <select className="all-cases-sort all-cases-game-filter" value={casesGameFilter} onChange={(event) => setCasesGameFilter(event.target.value)} aria-label="Filter cases by game">
+                    <option value="all">All games</option>
+                    <option value="steal-a-brainrot">Steal a Brainrot</option>
+                    <option value="donutsmp">DonutSMP</option>
+                  </select>
                   <select className="all-cases-sort" value={casesSort} onChange={(event) => setCasesSort(event.target.value)} aria-label="Sort cases">
                     <option value="featured">Featured</option>
                     <option value="price-low">Price: Low to high</option>
@@ -7650,13 +8744,15 @@ useEffect(() => {
                       className="case-art-wrap"
                       style={{
                         position: "relative",
-                        height: "180px",
-                        minHeight: "180px",
+                        height: "190px",
+                        minHeight: "190px",
                         overflow: "hidden",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
                         flexShrink: 0,
+                        padding: "8px 16px",
+                        boxSizing: "border-box",
                       }}
                     >
                       <div className="case-art-glow"></div>
@@ -7668,12 +8764,13 @@ useEffect(() => {
                             zIndex: 1,
                             width: "auto",
                             height: "auto",
-                            maxWidth: "92%",
-                            maxHeight: "92%",
+                            maxWidth: "82%",
+                            maxHeight: "82%",
                             objectFit: "contain",
                             objectPosition: "center",
                             display: "block",
                             flex: "0 0 auto",
+                            transform: "none",
                           }}
                           src={c.image_url}
                           alt={`${c.name} case artwork`}
@@ -7768,42 +8865,65 @@ useEffect(() => {
               </div>
             ) : liveActivity.length ? (
               <div className="recent-wins-grid live-activity-grid">
-                {liveActivity.slice(0, 6).map((item, index) => (
-                  <div
-                    className={`recent-win ${rarityClass(item.rarity)}${
-                      liveActivityEnteringId === item.id ? " live-activity-entering" : ""
-                    }`}
-                    key={`${item.id}-${item.userId}-${index}`}
-                  >
-                    <span className="recent-win-icon">
-                      <ItemArt rarity={item.rarity} imageUrl={item.image_url || item.imageUrl} compact />
-                    </span>
+                {liveActivity.slice(0, 6).map((item, index) => {
+                  const isOriginal = item.type === "original";
+                  const status = String(item.status || "").toLowerCase();
+                  const payoutCents = Number(item.payoutCents ?? item.valueCents ?? 0);
+                  const betCents = Number(item.betCents || 0);
+                  const isWin = status === "won" || status === "cashed_out" || payoutCents > 0;
+                  const gameLabel = item.gameLabel || item.game || "Original Game";
+                  const resultTitle = isOriginal
+                    ? (status === "cashed_out"
+                      ? `${item.username || "Player"} cashed out ${gameLabel}`
+                      : isWin
+                        ? `${item.username || "Player"} won ${gameLabel}`
+                        : `${item.username || "Player"} lost on ${gameLabel}`)
+                    : `${item.username || "Player"} won ${item.itemName}`;
+                  const resultSubtitle = isOriginal
+                    ? `${status === "cashed_out" ? "Cashed out" : status === "won" ? "Won" : "Lost"} · Bet $${(betCents / 100).toFixed(2)}${Number.isFinite(Number(item.multiplier)) && Number(item.multiplier) > 0 ? ` · ${Number(item.multiplier).toFixed(2)}x` : ""}`
+                    : `${item.rarity} · ${item.caseName}`;
+                  const displayCents = isOriginal ? payoutCents : Number(item.valueCents || 0);
 
-                    <div>
-                      <strong>
-                        {item.username || "Player"} won {item.itemName}
-                      </strong>
+                  return (
+                    <div
+                      className={`recent-win ${isOriginal ? "original-game" : rarityClass(item.rarity)}${
+                        liveActivityEnteringId === item.id ? " live-activity-entering" : ""
+                      }`}
+                      key={`${item.id}-${item.userId}-${index}`}
+                    >
+                      <span className="recent-win-icon">
+                        {isOriginal ? (
+                          <span
+                            aria-hidden="true"
+                            style={{ fontSize: 18, lineHeight: 1 }}
+                          >
+                            {item.icon || "🎮"}
+                          </span>
+                        ) : (
+                          <ItemArt rarity={item.rarity} imageUrl={item.image_url || item.imageUrl} compact />
+                        )}
+                      </span>
 
-                      <small>
-                        {item.rarity} · {item.caseName}
+                      <div>
+                        <strong>{resultTitle}</strong>
+                        <small>{resultSubtitle}</small>
+                      </div>
 
-                      </small>
+                      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5 }}>
+                        {liveActivityEnteringId === item.id && (
+                          <span style={{ fontSize: 8, fontWeight: 900, letterSpacing: 1.2, color: "#ffffff", background: "#a57cff", borderRadius: 999, padding: "3px 7px", boxShadow: "0 0 18px rgba(165,124,255,.35)" }}>NEW</span>
+                        )}
+                        <b style={{ color: isOriginal && !isWin ? "#ff8b9d" : undefined }}>
+                          {isOriginal && !isWin ? "-$" : "$"}{(displayCents / 100).toFixed(2)}
+                        </b>
+                      </div>
                     </div>
-
-                    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5 }}>
-                      {liveActivityEnteringId === item.id && (
-                        <span style={{ fontSize: 8, fontWeight: 900, letterSpacing: 1.2, color: "#ffffff", background: "#a57cff", borderRadius: 999, padding: "3px 7px", boxShadow: "0 0 18px rgba(165,124,255,.35)" }}>NEW</span>
-                      )}
-                      <b>
-                        ${(Number(item.valueCents || 0) / 100).toFixed(2)}
-                      </b>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <div className="live-activity-empty">
-                No case openings have been recorded yet. Be the first to win.
+                No recent activity has been recorded yet. Be the first to play.
               </div>
             )}
           </div>
@@ -8683,25 +9803,23 @@ useEffect(() => {
             </p>
           </details>
         </section>
+        </div>
       </main>
 
-      <footer>
-        <div className="brand">
-          <div className="brand-mark">
-            ✦
+      {!originalGameOpen && !colorDicingOpen && (
+        <footer>
+          <div className="brand">
+            <div className="brand-mark">
+              ✦
+            </div>
+
+            <span>
+              CASE<span>X</span>
+            </span>
           </div>
 
-          <span>
-            CASE<span>X</span>
-          </span>
-        </div>
-
-        <p>
-          Demo interface — replace branding,
-          assets, odds and legal copy before
-          launch.
-        </p>
-      </footer>
+        </footer>
+      )}
 
       {bulkSellConfirm && (
         <div
@@ -9168,15 +10286,11 @@ useEffect(() => {
               ×
             </button>
 
-            <div className="wallet-premium-header">
+            <div className="wallet-premium-header wallet-premium-header-compact">
               <div>
                 <div className="eyebrow">
                   WALLET
                 </div>
-                <h2>Manage your money</h2>
-                <p>
-                  Your balance, wallet activity and account funds in one place.
-                </p>
               </div>
 
               <div className="wallet-status-pill">
@@ -9215,6 +10329,9 @@ useEffect(() => {
                 onClick={() => {
                   setWalletTab("wallet");
                   setWalletAction("deposit");
+                  setCryptoPayment(null);
+                  setBrainrotDeposit(null);
+                  setWalletAmount("");
                 }}
               >
                 <span>Deposit</span>
@@ -9275,67 +10392,95 @@ useEffect(() => {
             {walletTab !== "history" ? (
               <>
                 {walletAction === "deposit" && cryptoPayment ? (
-                  <div
-                    style={{
-                      border: "1px solid rgba(255,255,255,0.10)",
-                      borderRadius: 18,
-                      padding: 18,
-                      background: "rgba(255,255,255,0.025)",
-                    }}
-                  >
-                    <div className="eyebrow">CRYPTO DEPOSIT</div>
-                    <h3 style={{ margin: "6px 0 4px" }}>Send your payment</h3>
-<p style={{ margin: "0 0 14px", opacity: 0.72, lineHeight: 1.5 }}>
-  Send any amount you want to this address. Your balance will be credited with the amount received.
-</p>
-                    <div className="wallet-qr-frame" style={{ display: "grid", placeItems: "center", padding: 14, borderRadius: 14, background: "#fff", width: "fit-content", margin: "0 auto 14px" }}>
+                  <div className="casex-clean-crypto-deposit">
+                    <div className="casex-clean-crypto-row">
+                      <span className="casex-clean-label">Currency</span>
+                      <div className="casex-clean-select casex-clean-select-live">
+                        <span className="casex-clean-coin">
+                          {String(cryptoPayment.payCurrency || "crypto").slice(0, 1).toUpperCase()}
+                        </span>
+                        <select
+                          value={depositCurrency}
+                          onChange={(event) => switchDepositCurrency(event.target.value)}
+                          disabled={walletLoading}
+                          aria-label="Choose deposit cryptocurrency"
+                        >
+                          {CRYPTO_DEPOSIT_OPTIONS.map((option) => (
+                            <option key={option.code} value={option.code}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                        <span className="casex-clean-balance">
+                          {cryptoPayment.network || ""}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="casex-clean-crypto-row">
+                      <span className="casex-clean-label">Deposit address</span>
+                      <div className="casex-clean-address">
+                        <code>{cryptoPayment.payAddress || ""}</code>
+                        <button
+                          type="button"
+                          className="casex-clean-icon-btn"
+                          onClick={copyCryptoAddress}
+                          aria-label="Copy deposit address"
+                          title="Copy address"
+                        >
+                          ⧉
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="casex-clean-warning" role="alert">
+                      <span>!</span>
+                      <strong>
+                        Send {String(cryptoPayment.payCurrency || "crypto").toUpperCase()} on {cryptoPayment.network || "the selected network"} only.
+                      </strong>
+                    </div>
+
+                    <div className="casex-clean-qr">
                       <img
                         src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(cryptoPayment.payAddress || "")}`}
                         alt="Crypto deposit QR code"
                         width="220"
                         height="220"
-                        style={{ display: "block" }}
                       />
                     </div>
-<div style={{ marginBottom: 12 }}>
-  <small style={{ opacity: 0.62 }}>MINIMUM DEPOSIT</small>
-  <strong style={{ display: "block", marginTop: 3, fontSize: 22 }}>
-    ${Number(cryptoPayment.minimumUsd || 0).toFixed(2)} USD
-  </strong>
-</div>
 
-<div className="wallet-crypto-network-warning" role="alert">
-  <span className="wallet-crypto-network-warning-icon">!</span>
+                    <div className="casex-clean-deposit-meta">
+                      <div>
+                        <span>Minimum deposit</span>
+                        <strong>${Number(cryptoPayment.minimumUsd || 0).toFixed(2)}</strong>
+                      </div>
 
-  <div>
-    <strong>
-      Send {String(cryptoPayment.payCurrency || "crypto").toUpperCase()} only
-    </strong>
-
-    <p>
-      Only send {String(cryptoPayment.payCurrency || "the selected coin").toUpperCase()} on the{" "}
-      {cryptoPayment.network || "selected network"} network to this address.
-      Sending another asset or using another network may result in permanent loss.
-    </p>
-  </div>
-</div>
-
-                    <div style={{ marginBottom: 12 }}>
-                      <small style={{ opacity: 0.62 }}>DEPOSIT ADDRESS</small>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 5, padding: "10px 11px", borderRadius: 10, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
-                        <code style={{ flex: 1, overflowWrap: "anywhere", fontSize: 12 }}>
-                          {truncateAddress(cryptoPayment.payAddress, 34)}
-                        </code>
-                        <button type="button" className="secondary" onClick={copyCryptoAddress}>Copy</button>
+                      <div className={
+                        cryptoPayment.status === "completed"
+                          ? "casex-clean-status success"
+                          : cryptoPayment.status === "failed" || cryptoPayment.status === "expired"
+                            ? "casex-clean-status error"
+                            : "casex-clean-status"
+                      }>
+                        <span className="casex-clean-status-dot"></span>
+                        <strong>
+                          {cryptoPayment.status === "completed"
+                            ? "Payment confirmed"
+                            : cryptoPayment.status === "failed"
+                              ? "Payment failed"
+                              : cryptoPayment.status === "expired"
+                                ? "Payment expired"
+                                : "Waiting for payment"}
+                        </strong>
                       </div>
                     </div>
-                    <div style={{ padding: "10px 12px", borderRadius: 10, background: cryptoPayment.status === "completed" ? "rgba(60, 220, 150, 0.10)" : cryptoPayment.status === "failed" || cryptoPayment.status === "expired" ? "rgba(255, 80, 100, 0.10)" : "rgba(140, 100, 255, 0.10)" }}>
-                      <strong>
-                        {cryptoPayment.status === "completed" ? "Payment confirmed" : cryptoPayment.status === "failed" ? "Payment failed" : cryptoPayment.status === "expired" ? "Payment expired" : "Waiting for payment…"}
-                      </strong>
-                    </div>
-                    <button type="button" className="primary wide" style={{ marginTop: 12 }} onClick={closeCryptoPayment}>
-                      {cryptoPayment.status === "completed" ? "Done" : "Close"}
+
+                    <button
+                      type="button"
+                      className="casex-clean-history-link"
+                      onClick={() => setWalletTab("history")}
+                    >
+                      Deposit history →
                     </button>
                   </div>
                 ) : (
@@ -9344,7 +10489,7 @@ useEffect(() => {
                       <label className="wallet-input-wrap wallet-input-premium" style={{ marginBottom: 12 }}>
                         <span>Crypto network</span>
                         <div>
-                          <select value={depositCurrency} onChange={(event) => setDepositCurrency(event.target.value)} disabled={walletLoading} style={{ width: "100%", background: "transparent", border: 0, outline: 0, color: "inherit", font: "inherit", cursor: walletLoading ? "not-allowed" : "pointer" }}>
+                          <select className="casex-wallet-native-hidden-arrow" value={depositCurrency} onChange={(event) => setDepositCurrency(event.target.value)} disabled={walletLoading} style={{ width: "100%", background: "transparent", border: 0, outline: 0, color: "inherit", font: "inherit", cursor: walletLoading ? "not-allowed" : "pointer" }}>
                             {CRYPTO_DEPOSIT_OPTIONS.map((option) => (
                               <option key={option.code} value={option.code}>{option.label}</option>
                             ))}
@@ -9539,24 +10684,28 @@ useEffect(() => {
   <span>→</span>
 </button>
 
-                    {walletTab === "wallet" && (
-                      <div className="brainrot-deposit-card">
-                        <div className="brainrot-deposit-card-icon">◇</div>
-                        <div className="brainrot-deposit-card-copy">
-                          <strong>Deposit Brainrots</strong>
-                          <span>Send your Brainrots through Discord and receive CASEX balance after manual verification.</span>
-                        </div>
-                        <button type="button" className="secondary-button" onClick={createBrainrotDeposit} disabled={brainrotDepositLoading}>
-                          {brainrotDepositLoading ? "Creating..." : "Deposit Brainrots"}
-                        </button>
-                      </div>
-                    )}
-
-                    <div className="wallet-action-note">
-                      <span className="wallet-note-icon">i</span>
-                      <p>{walletTab === "withdraw" ? "Withdrawals will use your available wallet balance." : "Your balance is credited only after NOWPayments confirms the transaction."}</p>
-                    </div>
                   </>
+                )}
+
+                {/* Keep the Brainrot deposit option available on both the
+                    normal deposit screen and the generated crypto-address
+                    screen. Creating a crypto address must not hide it. */}
+                {walletTab === "wallet" && (
+                  <div className="brainrot-deposit-card">
+                    <div className="brainrot-deposit-card-icon">◇</div>
+                    <div className="brainrot-deposit-card-copy">
+                      <strong>Deposit Brainrots</strong>
+                      <span>Send your Brainrots through Discord and receive CASEX balance after manual verification.</span>
+                    </div>
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      onClick={createBrainrotDeposit}
+                      disabled={brainrotDepositLoading}
+                    >
+                      {brainrotDepositLoading ? "Creating..." : "Deposit Brainrots"}
+                    </button>
+                  </div>
                 )}
               </>
 ) : (
@@ -9741,7 +10890,7 @@ useEffect(() => {
             opening
               ? "case-page-opening"
               : ""
-          }`}
+          } ${selected?.game_theme === "blue" ? "game-blue" : ""}`}
         >
           {!opening &&
             !result && (
@@ -11249,168 +12398,6 @@ setSellConfirmItem({
         </div>
       )}
 
-      {jackpotEntryOpen && authUser && (
-        <div
-          className="jackpot-live-entry-backdrop"
-          onClick={() => !jackpotEntryLoading && closeJackpotEntry()}
-        >
-          <div
-            className="jackpot-live-entry-modal"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <button
-              type="button"
-              className="jackpot-live-entry-close"
-              onClick={closeJackpotEntry}
-              disabled={jackpotEntryLoading}
-              aria-label="Close jackpot entry"
-            >
-              ×
-            </button>
-
-            <div className="eyebrow">DAILY JACKPOT</div>
-            <h2>Enter the jackpot</h2>
-            <p>
-              Add any amount from $0.10 with no maximum, or contribute
-              Brainrots directly from your inventory.
-            </p>
-
-            <div className="jackpot-live-mode">
-              <button
-                type="button"
-                className={jackpotEntryMode === "balance" ? "active" : ""}
-                onClick={() => {
-                  if (jackpotEntryLoading) return;
-                  setJackpotEntryMode("balance");
-                  setJackpotEntryError("");
-                  setJackpotSelectedInventoryIds(new Set());
-                }}
-              >
-                💰 CASEX Balance
-              </button>
-
-              <button
-                type="button"
-                className={jackpotEntryMode === "brainrots" ? "active" : ""}
-                onClick={() => {
-                  if (jackpotEntryLoading) return;
-                  setJackpotEntryMode("brainrots");
-                  setJackpotEntryError("");
-                  setJackpotAmount("");
-                }}
-              >
-                ◇ Brainrots
-              </button>
-            </div>
-
-            {jackpotEntryMode === "balance" ? (
-              <>
-                <label className="jackpot-live-field">
-                  <span>CONTRIBUTION AMOUNT · MINIMUM $0.10 · NO MAXIMUM</span>
-                  <input
-                    type="number"
-                    inputMode="decimal"
-                    min="0.10"
-                    step="0.01"
-                    value={jackpotAmount}
-                    onChange={(event) => {
-                      setJackpotAmount(event.target.value);
-                      setJackpotEntryError("");
-                    }}
-                    placeholder="25.00"
-                    disabled={jackpotEntryLoading}
-                  />
-                </label>
-
-                <button
-                  type="button"
-                  className="jackpot-live-submit"
-                  onClick={enterJackpotWithBalance}
-                  disabled={jackpotEntryLoading}
-                >
-                  {jackpotEntryLoading ? "Entering..." : "Enter Jackpot"}
-                </button>
-              </>
-            ) : (
-              <>
-                <div className="jackpot-live-selection-head">
-                  <strong>Select Brainrots</strong>
-                  <span>
-                    ${(jackpotSelectedValueCents / 100).toFixed(2)}
-                  </span>
-                </div>
-
-                <div className="jackpot-live-brainrot-list">
-                  {jackpotAvailableInventory.length === 0 ? (
-                    <div className="jackpot-live-empty">
-                      You have no available Brainrots in your inventory.
-                    </div>
-                  ) : (
-                    jackpotAvailableInventory.map((item) => {
-                      const selectedItem = jackpotSelectedInventoryIds.has(
-                        Number(item.id)
-                      );
-
-                      return (
-                        <button
-                          type="button"
-                          key={item.id}
-                          className={`jackpot-live-brainrot ${
-                            selectedItem ? "selected" : ""
-                          }`}
-                          onClick={() =>
-                            toggleJackpotInventoryItem(item.id)
-                          }
-                          disabled={jackpotEntryLoading}
-                        >
-                          <span className="jackpot-live-brainrot-art">
-                            <ItemArt
-                              rarity={item.rarity}
-                              imageUrl={item.image_url || item.imageUrl}
-                              compact
-                            />
-                          </span>
-
-                          <span className="jackpot-live-brainrot-copy">
-                            <strong>{item.name || "Brainrot"}</strong>
-                            <span>
-                              ${(Number(item.value_cents || 0) / 100).toFixed(2)}
-                            </span>
-                          </span>
-                        </button>
-                      );
-                    })
-                  )}
-                </div>
-
-                <button
-                  type="button"
-                  className="jackpot-live-submit"
-                  onClick={enterJackpotWithBrainrots}
-                  disabled={
-                    jackpotEntryLoading ||
-                    !jackpotSelectedInventoryIds.size
-                  }
-                >
-                  {jackpotEntryLoading
-                    ? "Adding Brainrots..."
-                    : `Enter with $${(
-                        jackpotSelectedValueCents /
-                        100
-                      ).toFixed(2)} in Brainrots`}
-                </button>
-              </>
-            )}
-
-            {jackpotEntryError && (
-              <div className="jackpot-live-error">
-                {jackpotEntryError}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
       {settingsOpen && authUser && (
         <div
           className="settings-modal-backdrop"
@@ -12074,6 +13061,2308 @@ setSellConfirmItem({
           </div>
         </div>
       )}
+
+<style>{`
+  /* ============================================================
+     CASEX DESIGN 4 — MARKETPLACE SIDEBAR + FULL-WIDTH ROW
+     ============================================================ */
+  .casex-d4-side-link.marketplace-link{
+    display:flex !important;
+  }
+
+  .casex-d4-content .home-feature-zone{
+    width:100% !important;
+    max-width:none !important;
+    margin:34px 0 34px !important;
+    padding:0 !important;
+  }
+
+  .casex-d4-content .home-feature-heading{
+    width:100% !important;
+    margin-bottom:18px !important;
+  }
+
+  .casex-d4-content .home-feature-grid{
+    width:100% !important;
+    max-width:none !important;
+    display:block !important;
+  }
+
+  .casex-d4-content .home-trending-feature{
+    width:100% !important;
+    max-width:none !important;
+    min-width:0 !important;
+    padding:22px !important;
+    box-sizing:border-box !important;
+    border:1px solid rgba(108,94,144,.24) !important;
+    border-radius:18px !important;
+    background:
+      radial-gradient(700px 260px at 8% 0%,rgba(120,72,222,.11),transparent 60%),
+      linear-gradient(160deg,rgba(14,16,25,.96),rgba(8,9,14,.94)) !important;
+    box-shadow:0 20px 55px rgba(0,0,0,.22),inset 0 1px 0 rgba(255,255,255,.025) !important;
+  }
+
+  .casex-d4-content .home-trending-feature .home-section-heading{
+    width:100% !important;
+    display:flex !important;
+    align-items:flex-end !important;
+    justify-content:space-between !important;
+    gap:20px !important;
+    margin-bottom:18px !important;
+  }
+
+  .casex-d4-content .home-trending-grid-feature{
+    width:100% !important;
+    display:grid !important;
+    grid-template-columns:repeat(6,minmax(0,1fr)) !important;
+    gap:12px !important;
+    align-items:stretch !important;
+  }
+
+  .casex-d4-content .home-trending-card-feature{
+    width:100% !important;
+    min-width:0 !important;
+    min-height:245px !important;
+    padding:10px !important;
+    box-sizing:border-box !important;
+    display:flex !important;
+    flex-direction:column !important;
+    align-items:stretch !important;
+    border-radius:13px !important;
+  }
+
+  .casex-d4-content .home-trending-card-feature .home-trending-art{
+    flex:1 1 auto !important;
+    min-height:165px !important;
+    display:grid !important;
+    place-items:center !important;
+    overflow:hidden !important;
+  }
+
+  .casex-d4-content .home-trending-card-feature .home-trending-card-copy{
+    padding:10px 4px 4px !important;
+  }
+
+  .casex-d4-content .home-trending-card-feature .home-trending-card-copy strong,
+  .casex-d4-content .home-trending-card-feature .home-trending-card-copy small,
+  .casex-d4-content .home-trending-card-feature .home-trending-card-copy span{
+    display:block !important;
+  }
+
+  .casex-d4-content .home-section-link{
+    flex:0 0 auto !important;
+    white-space:nowrap !important;
+  }
+
+  @media(max-width:1200px){
+    .casex-d4-content .home-trending-grid-feature{
+      grid-template-columns:repeat(4,minmax(0,1fr)) !important;
+    }
+  }
+
+  @media(max-width:900px){
+    .casex-d4-content .home-trending-grid-feature{
+      grid-template-columns:repeat(3,minmax(0,1fr)) !important;
+    }
+  }
+
+  @media(max-width:700px){
+    .casex-d4-content .home-trending-feature{
+      padding:16px !important;
+    }
+    .casex-d4-content .home-trending-feature .home-section-heading{
+      align-items:flex-start !important;
+      flex-direction:column !important;
+    }
+    .casex-d4-content .home-trending-grid-feature{
+      grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+    }
+  }
+`}</style>
+
+<style>{`
+  /* ============================================================
+     CASEX DESIGN 4 — HOMEPAGE CATEGORY SPACING PASS
+     Give major homepage sections room to breathe.
+     ============================================================ */
+  .casex-d4-content > .casex-game-hub.section{
+    margin-bottom:64px !important;
+  }
+  .casex-d4-content > .home-feature-zone.section{
+    margin-top:0 !important;
+    margin-bottom:64px !important;
+  }
+  .casex-d4-content > #cases.section{
+    margin-top:64px !important;
+    margin-bottom:64px !important;
+  }
+  .casex-d4-content > section + section{
+    margin-top:56px !important;
+  }
+  @media(max-width:900px){
+    .casex-d4-content > .casex-game-hub.section{margin-bottom:52px !important}
+    .casex-d4-content > section + section{margin-top:46px !important}
+    .casex-d4-content > #cases.section{margin-top:52px !important;margin-bottom:52px !important}
+  }
+`}</style>
+
+
+<style>{`
+  /* ============================================================
+     CASEX DESIGN 4 — FINAL HOMEPAGE SPACING + ANCHOR OFFSET
+     Keep section headings visible below the fixed top navigation.
+     ============================================================ */
+
+  /* When the sidebar scrolls to Originals, don't hide the
+     "ORIGINAL GAMES / Built different." heading behind the
+     fixed CASEX top bar. */
+  .casex-d4-content #original-games{
+    scroll-margin-top:108px !important;
+  }
+
+  /* Give each major category more breathing room. */
+  .casex-d4-content #original-games{
+    margin-bottom:78px !important;
+  }
+
+  .casex-d4-content #marketplace{
+    margin-top:0 !important;
+    margin-bottom:82px !important;
+  }
+
+  .casex-d4-content #cases{
+    margin-top:0 !important;
+    margin-bottom:78px !important;
+  }
+
+  /* Keep the transition between the hero and the Originals
+     section comfortable too. */
+  .casex-d4-content .hero + #original-games{
+    margin-top:34px !important;
+  }
+
+  /* Slightly smaller spacing on medium screens. */
+  @media(max-width:900px){
+    .casex-d4-content #original-games{
+      scroll-margin-top:92px !important;
+      margin-bottom:62px !important;
+    }
+
+    .casex-d4-content #marketplace{
+      margin-bottom:66px !important;
+    }
+
+    .casex-d4-content #cases{
+      margin-bottom:62px !important;
+    }
+  }
+
+  @media(max-width:700px){
+    .casex-d4-content #original-games{
+      scroll-margin-top:82px !important;
+      margin-bottom:48px !important;
+    }
+
+    .casex-d4-content #marketplace{
+      margin-bottom:52px !important;
+    }
+
+    .casex-d4-content #cases{
+      margin-bottom:48px !important;
+    }
+  }
+`}</style>
+
+
+<style>{`
+  /* ============================================================
+     CASEX DESIGN 4 — TOP BAR BRAND / SHUFFLE-STYLE POSITION
+     Push the CASEX mark forward from the hamburger and enlarge
+     the complete brand lockup.
+     ============================================================ */
+
+  @media(min-width:1101px){
+    .casex-design4-nav .brand{
+      margin-left:236px !important;
+      gap:14px !important;
+    }
+
+    .casex-design4-nav .brand .brand-mark{
+      width:46px !important;
+      height:46px !important;
+      min-width:46px !important;
+      border-radius:12px !important;
+      font-size:22px !important;
+      box-shadow:0 10px 28px rgba(118,67,218,.28) !important;
+    }
+
+    .casex-design4-nav .brand > span{
+      font-size:20px !important;
+      line-height:1 !important;
+      font-weight:900 !important;
+      letter-spacing:-.02em !important;
+    }
+  }
+
+  @media(min-width:901px) and (max-width:1100px){
+    .casex-design4-nav .brand{
+      margin-left:150px !important;
+      gap:13px !important;
+    }
+
+    .casex-design4-nav .brand .brand-mark{
+      width:44px !important;
+      height:44px !important;
+      min-width:44px !important;
+      font-size:21px !important;
+    }
+
+    .casex-design4-nav .brand > span{
+      font-size:19px !important;
+    }
+  }
+
+  @media(min-width:701px) and (max-width:900px){
+    .casex-design4-nav .brand{
+      margin-left:78px !important;
+      gap:11px !important;
+    }
+
+    .casex-design4-nav .brand .brand-mark{
+      width:42px !important;
+      height:42px !important;
+      min-width:42px !important;
+      font-size:20px !important;
+    }
+
+    .casex-design4-nav .brand > span{
+      font-size:18px !important;
+    }
+  }
+
+  @media(max-width:700px){
+    .casex-design4-nav .brand{
+      margin-left:0 !important;
+      gap:9px !important;
+    }
+
+    .casex-design4-nav .brand .brand-mark{
+      width:40px !important;
+      height:40px !important;
+      min-width:40px !important;
+      font-size:19px !important;
+    }
+
+    .casex-design4-nav .brand > span{
+      font-size:17px !important;
+    }
+  }
+`}</style>
+
+
+<style>{`
+  /* ============================================================
+     CASEX WALLET — SHUFFLE-STYLE DEPOSIT MODAL
+     Visual redesign only: existing wallet/deposit/withdraw/history
+     handlers and backend calls remain unchanged.
+     ============================================================ */
+
+  .wallet-modal-backdrop{
+    position:fixed !important;
+    inset:0 !important;
+    z-index:5000 !important;
+    display:flex !important;
+    align-items:center !important;
+    justify-content:center !important;
+    padding:22px !important;
+    background:rgba(0,0,0,.72) !important;
+    backdrop-filter:blur(10px) !important;
+    -webkit-backdrop-filter:blur(10px) !important;
+  }
+
+  .wallet-modal-backdrop .wallet-modal.wallet-modal-premium{
+    position:relative !important;
+    width:min(560px,100%) !important;
+    max-width:560px !important;
+    max-height:min(720px,calc(100vh - 44px)) !important;
+    overflow-y:auto !important;
+    overflow-x:hidden !important;
+    margin:0 !important;
+    padding:24px 28px 26px !important;
+    border:1px solid rgba(135,105,211,.34) !important;
+    border-radius:18px !important;
+    background:
+      radial-gradient(420px 220px at 100% 0%,rgba(128,73,220,.12),transparent 66%),
+      linear-gradient(180deg,#12141b 0%,#111319 100%) !important;
+    box-shadow:
+      0 35px 100px rgba(0,0,0,.62),
+      0 0 0 1px rgba(255,255,255,.02) inset !important;
+  }
+
+  .wallet-modal-backdrop .wallet-modal.wallet-modal-premium::-webkit-scrollbar{
+    width:6px;
+  }
+
+  .wallet-modal-backdrop .wallet-modal.wallet-modal-premium::-webkit-scrollbar-thumb{
+    background:rgba(145,111,232,.28);
+    border-radius:999px;
+  }
+
+  .wallet-modal-backdrop .wallet-modal.wallet-modal-premium > .close{
+    position:absolute !important;
+    top:18px !important;
+    right:18px !important;
+    width:34px !important;
+    height:34px !important;
+    padding:0 !important;
+    border:0 !important;
+    background:transparent !important;
+    color:#b9bdc8 !important;
+    font-size:28px !important;
+    line-height:1 !important;
+    z-index:3 !important;
+  }
+
+  .wallet-modal-backdrop .wallet-modal.wallet-modal-premium > .close:hover{
+    color:#fff !important;
+    background:rgba(255,255,255,.04) !important;
+  }
+
+  .wallet-modal-backdrop .wallet-premium-header{
+    display:flex !important;
+    align-items:flex-start !important;
+    justify-content:space-between !important;
+    gap:20px !important;
+    margin:0 38px 20px 0 !important;
+    padding:0 !important;
+  }
+
+  .wallet-modal-backdrop .wallet-premium-header .eyebrow{
+    margin-bottom:5px !important;
+    font-size:10px !important;
+    letter-spacing:1.4px !important;
+  }
+
+  .wallet-modal-backdrop .wallet-premium-header h2{
+    margin:0 !important;
+    font-size:29px !important;
+    line-height:1.05 !important;
+    letter-spacing:-1px !important;
+    font-weight:950 !important;
+  }
+
+  .wallet-modal-backdrop .wallet-premium-header p{
+    margin:7px 0 0 !important;
+    color:#858a96 !important;
+    font-size:11px !important;
+    line-height:1.45 !important;
+    max-width:390px !important;
+  }
+
+  .wallet-modal-backdrop .wallet-status-pill{
+    flex:0 0 auto !important;
+    margin-top:2px !important;
+    padding:7px 10px !important;
+    border:1px solid rgba(80,221,166,.25) !important;
+    border-radius:999px !important;
+    background:rgba(61,194,147,.07) !important;
+    color:#7ee6b4 !important;
+    font-size:9px !important;
+  }
+
+  /* Shuffle uses the transaction tabs as the main navigation.
+     Keep CASEX's three existing functional tabs, but give them
+     the same compact underlined treatment. */
+  .wallet-modal-backdrop .wallet-tabs.wallet-tabs-premium{
+    position:relative !important;
+    display:grid !important;
+    grid-template-columns:repeat(3,minmax(0,1fr)) !important;
+    gap:0 !important;
+    margin:2px 0 20px !important;
+    padding:0 !important;
+    border-bottom:1px solid #424652 !important;
+    background:transparent !important;
+    border-radius:0 !important;
+  }
+
+  .wallet-modal-backdrop .wallet-tabs.wallet-tabs-premium button{
+    position:relative !important;
+    min-height:52px !important;
+    padding:0 8px 11px !important;
+    border:0 !important;
+    border-radius:0 !important;
+    background:transparent !important;
+    color:#8e929d !important;
+    box-shadow:none !important;
+    font-size:13px !important;
+    font-weight:850 !important;
+  }
+
+  .wallet-modal-backdrop .wallet-tabs.wallet-tabs-premium button span{
+    display:block !important;
+    font-size:13px !important;
+    font-weight:900 !important;
+  }
+
+  .wallet-modal-backdrop .wallet-tabs.wallet-tabs-premium button small{
+    display:none !important;
+  }
+
+  .wallet-modal-backdrop .wallet-tabs.wallet-tabs-premium button::after{
+    content:"" !important;
+    position:absolute !important;
+    left:14% !important;
+    right:14% !important;
+    bottom:-1px !important;
+    height:2px !important;
+    border-radius:999px 999px 0 0 !important;
+    background:transparent !important;
+  }
+
+  .wallet-modal-backdrop .wallet-tabs.wallet-tabs-premium button.active{
+    color:#a87cff !important;
+  }
+
+  .wallet-modal-backdrop .wallet-tabs.wallet-tabs-premium button.active::after{
+    background:#9b63ff !important;
+    box-shadow:0 0 14px rgba(155,99,255,.35) !important;
+  }
+
+  /* Hide the old oversized balance hero in the transaction modal.
+     The compact modal should feel like Shuffle's wallet sheet. */
+  .wallet-modal-backdrop .wallet-hero-card{
+    display:none !important;
+  }
+
+  .wallet-modal-backdrop .wallet-action-heading{
+    margin:4px 0 14px !important;
+  }
+
+  .wallet-modal-backdrop .wallet-action-heading strong{
+    display:block !important;
+    font-size:17px !important;
+    margin-bottom:4px !important;
+  }
+
+  .wallet-modal-backdrop .wallet-action-heading span{
+    display:block !important;
+    color:#7f8490 !important;
+    font-size:10px !important;
+    line-height:1.45 !important;
+  }
+
+  /* Compact form fields like Shuffle's currency/address rows. */
+  .wallet-modal-backdrop .wallet-input-wrap.wallet-input-premium{
+    margin-bottom:12px !important;
+  }
+
+  .wallet-modal-backdrop .wallet-input-wrap.wallet-input-premium > span{
+    margin-bottom:6px !important;
+    color:#b5b9c2 !important;
+    font-size:10px !important;
+    font-weight:850 !important;
+  }
+
+  .wallet-modal-backdrop .wallet-input-wrap.wallet-input-premium > div{
+    min-height:47px !important;
+    border:1px solid #2f3440 !important;
+    border-radius:9px !important;
+    background:#1e222a !important;
+    padding:0 13px !important;
+  }
+
+  .wallet-modal-backdrop .wallet-input-wrap.wallet-input-premium select,
+  .wallet-modal-backdrop .wallet-input-wrap.wallet-input-premium input{
+    color:#f3f4f8 !important;
+    font-size:12px !important;
+    font-weight:750 !important;
+  }
+
+  .wallet-modal-backdrop .wallet-input-wrap.wallet-input-premium select option{
+    background:#1b1e25 !important;
+    color:#f3f4f8 !important;
+  }
+
+  /* Primary action matches the full-width purple Shuffle action. */
+  .wallet-modal-backdrop .wallet-primary-action{
+    width:100% !important;
+    min-height:49px !important;
+    margin-top:13px !important;
+    border-radius:9px !important;
+    font-size:12px !important;
+    font-weight:900 !important;
+  }
+
+  .wallet-modal-backdrop .wallet-primary-action span{
+    margin-left:auto !important;
+    font-size:16px !important;
+  }
+
+  .wallet-modal-backdrop .wallet-action-note{
+    margin-top:12px !important;
+    border:1px solid #292e38 !important;
+    border-radius:9px !important;
+    background:#171a21 !important;
+    padding:10px 11px !important;
+  }
+
+  .wallet-modal-backdrop .wallet-action-note p{
+    color:#777d89 !important;
+    font-size:9px !important;
+    line-height:1.4 !important;
+  }
+
+  /* Brainrot deposit becomes a secondary compact row. */
+  .wallet-modal-backdrop .brainrot-deposit-card{
+    display:grid !important;
+    grid-template-columns:auto minmax(0,1fr) auto !important;
+    align-items:center !important;
+    gap:12px !important;
+    margin-top:12px !important;
+    padding:12px !important;
+    border:1px solid #303542 !important;
+    border-radius:10px !important;
+    background:#171a21 !important;
+  }
+
+  .wallet-modal-backdrop .brainrot-deposit-card-copy strong{
+    font-size:11px !important;
+  }
+
+  .wallet-modal-backdrop .brainrot-deposit-card-copy span{
+    color:#7f8490 !important;
+    font-size:9px !important;
+    line-height:1.35 !important;
+  }
+
+  .wallet-modal-backdrop .brainrot-deposit-card .secondary-button{
+    min-height:38px !important;
+    padding:0 13px !important;
+    border-radius:8px !important;
+    white-space:nowrap !important;
+  }
+
+  /* Generated crypto-payment state: compact address / QR presentation. */
+  .wallet-modal-backdrop .wallet-qr-frame{
+    margin:12px auto 14px !important;
+    padding:10px !important;
+    border-radius:9px !important;
+  }
+
+  .wallet-modal-backdrop .wallet-qr-frame img{
+    width:190px !important;
+    height:190px !important;
+  }
+
+  .wallet-modal-backdrop .wallet-crypto-network-warning,
+  .wallet-modal-backdrop .wallet-withdraw-network-warning{
+    border-radius:9px !important;
+    padding:10px 11px !important;
+  }
+
+  .wallet-modal-backdrop .wallet-crypto-network-warning strong,
+  .wallet-modal-backdrop .wallet-withdraw-network-warning strong{
+    font-size:10px !important;
+  }
+
+  .wallet-modal-backdrop .wallet-crypto-network-warning p,
+  .wallet-modal-backdrop .wallet-withdraw-network-warning p{
+    font-size:9px !important;
+    line-height:1.4 !important;
+  }
+
+  /* History keeps its existing data/logic, just uses the compact
+     transaction-sheet dimensions. */
+  .wallet-modal-backdrop .wallet-history-full{
+    margin-top:2px !important;
+  }
+
+  .wallet-modal-backdrop .wallet-history-header{
+    padding-bottom:12px !important;
+    margin-bottom:9px !important;
+    border-bottom:1px solid #353a45 !important;
+  }
+
+  .wallet-modal-backdrop .wallet-history-header h3{
+    font-size:16px !important;
+  }
+
+  @media(max-width:700px){
+    .wallet-modal-backdrop{
+      align-items:flex-end !important;
+      padding:10px !important;
+    }
+
+    .wallet-modal-backdrop .wallet-modal.wallet-modal-premium{
+      width:100% !important;
+      max-height:calc(100vh - 20px) !important;
+      padding:20px 18px 20px !important;
+      border-radius:16px 16px 12px 12px !important;
+    }
+
+    .wallet-modal-backdrop .wallet-premium-header{
+      margin-right:34px !important;
+    }
+
+    .wallet-modal-backdrop .wallet-premium-header h2{
+      font-size:25px !important;
+    }
+
+    .wallet-modal-backdrop .brainrot-deposit-card{
+      grid-template-columns:auto minmax(0,1fr) !important;
+    }
+
+    .wallet-modal-backdrop .brainrot-deposit-card .secondary-button{
+      grid-column:1 / -1 !important;
+      width:100% !important;
+    }
+  }
+`}</style>
+
+
+<style>{`
+  /* ============================================================
+     CASEX WALLET — GRAPHITE / PURPLE PALETTE REFINEMENT
+     Keep the existing wallet logic untouched.
+     ============================================================ */
+
+  .wallet-modal-backdrop{
+    background:
+      radial-gradient(520px 340px at 50% 32%,rgba(121,78,214,.10),transparent 72%),
+      rgba(2,3,7,.76) !important;
+    backdrop-filter:blur(12px) saturate(.9) !important;
+    -webkit-backdrop-filter:blur(12px) saturate(.9) !important;
+  }
+
+  .wallet-modal-backdrop .wallet-modal.wallet-modal-premium{
+    border:1px solid rgba(118,124,141,.28) !important;
+    background:
+      radial-gradient(500px 210px at 100% 0%,rgba(128,76,224,.095),transparent 68%),
+      linear-gradient(180deg,#111318 0%,#0f1116 100%) !important;
+    box-shadow:
+      0 40px 110px rgba(0,0,0,.68),
+      0 0 0 1px rgba(255,255,255,.018) inset !important;
+  }
+
+  .wallet-modal-backdrop .wallet-premium-header .eyebrow{
+    color:#a66cff !important;
+  }
+
+  .wallet-modal-backdrop .wallet-premium-header h2{
+    color:#f4f5f8 !important;
+  }
+
+  .wallet-modal-backdrop .wallet-premium-header p{
+    color:#858a96 !important;
+  }
+
+  .wallet-modal-backdrop .wallet-status-pill{
+    color:#70e0aa !important;
+    border-color:rgba(78,220,163,.28) !important;
+    background:rgba(62,195,143,.055) !important;
+  }
+
+  .wallet-modal-backdrop .wallet-tabs.wallet-tabs-premium{
+    border-bottom-color:#343841 !important;
+  }
+
+  .wallet-modal-backdrop .wallet-tabs.wallet-tabs-premium button{
+    color:#858a95 !important;
+  }
+
+  .wallet-modal-backdrop .wallet-tabs.wallet-tabs-premium button:hover{
+    color:#d4d6dd !important;
+  }
+
+  .wallet-modal-backdrop .wallet-tabs.wallet-tabs-premium button.active{
+    color:#aa72ff !important;
+  }
+
+  .wallet-modal-backdrop .wallet-tabs.wallet-tabs-premium button.active::after{
+    background:#9d61ff !important;
+    box-shadow:0 0 16px rgba(157,97,255,.28) !important;
+  }
+
+  .wallet-modal-backdrop .wallet-input-wrap.wallet-input-premium > span{
+    color:#a6abb6 !important;
+  }
+
+  .wallet-modal-backdrop .wallet-input-wrap.wallet-input-premium > div{
+    border-color:#30343d !important;
+    background:#20232a !important;
+    box-shadow:0 1px 0 rgba(255,255,255,.015) inset !important;
+  }
+
+  .wallet-modal-backdrop .wallet-input-wrap.wallet-input-premium > div:focus-within{
+    border-color:rgba(155,98,255,.74) !important;
+    box-shadow:
+      0 0 0 2px rgba(155,98,255,.10),
+      0 1px 0 rgba(255,255,255,.015) inset !important;
+  }
+
+  .wallet-modal-backdrop .wallet-input-wrap.wallet-input-premium select,
+  .wallet-modal-backdrop .wallet-input-wrap.wallet-input-premium input{
+    color:#f0f2f6 !important;
+  }
+
+  .wallet-modal-backdrop .wallet-action-heading strong{
+    color:#f1f2f5 !important;
+  }
+
+  .wallet-modal-backdrop .wallet-action-heading span{
+    color:#7c828e !important;
+  }
+
+  .wallet-modal-backdrop .wallet-action-note{
+    border-color:#2d323c !important;
+    background:#171a20 !important;
+  }
+
+  .wallet-modal-backdrop .wallet-action-note p{
+    color:#7d838e !important;
+  }
+
+  .wallet-modal-backdrop .wallet-primary-action{
+    color:#fff !important;
+    background:
+      linear-gradient(90deg,#7138d1 0%,#9659ef 50%,#b06fff 100%) !important;
+    border:1px solid rgba(188,145,255,.42) !important;
+    box-shadow:
+      0 12px 28px rgba(118,57,211,.22),
+      0 1px 0 rgba(255,255,255,.18) inset !important;
+  }
+
+  .wallet-modal-backdrop .wallet-primary-action:hover{
+    filter:brightness(1.05) !important;
+  }
+
+  .wallet-modal-backdrop .wallet-primary-action:disabled{
+    opacity:.58 !important;
+    filter:none !important;
+    box-shadow:none !important;
+  }
+
+  .wallet-modal-backdrop .brainrot-deposit-card{
+    border-color:#30343d !important;
+    background:#171a20 !important;
+  }
+
+  .wallet-modal-backdrop .brainrot-deposit-card-copy strong{
+    color:#eceef2 !important;
+  }
+
+  .wallet-modal-backdrop .brainrot-deposit-card-copy span{
+    color:#7d838e !important;
+  }
+
+  .wallet-modal-backdrop .wallet-crypto-network-warning,
+  .wallet-modal-backdrop .wallet-withdraw-network-warning{
+    border-color:rgba(239,130,93,.20) !important;
+    background:rgba(159,64,38,.085) !important;
+  }
+
+  .wallet-modal-backdrop .wallet-crypto-network-warning strong,
+  .wallet-modal-backdrop .wallet-withdraw-network-warning strong{
+    color:#ff9b78 !important;
+  }
+
+  .wallet-modal-backdrop .wallet-crypto-network-warning p,
+  .wallet-modal-backdrop .wallet-withdraw-network-warning p{
+    color:#a98b83 !important;
+  }
+
+  .wallet-modal-backdrop .wallet-hero-card{
+    border-color:#30343d !important;
+  }
+
+  .wallet-modal-backdrop .wallet-modal-balance{
+    color:#f2f3f6 !important;
+  }
+
+  .wallet-modal-backdrop .wallet-history-header{
+    border-bottom-color:#343841 !important;
+  }
+
+  .wallet-modal-backdrop .wallet-history-header h3{
+    color:#f0f1f4 !important;
+  }
+
+  .wallet-modal-backdrop .wallet-inline-warning{
+    border-color:rgba(255,171,90,.25) !important;
+    background:rgba(184,111,31,.08) !important;
+    color:#f4bd73 !important;
+  }
+
+  /* QR / crypto payment surface */
+  .wallet-modal-backdrop .wallet-qr-frame{
+    background:#ffffff !important;
+    box-shadow:0 12px 30px rgba(0,0,0,.30) !important;
+  }
+
+  /* Close button */
+  .wallet-modal-backdrop .wallet-modal.wallet-modal-premium > .close{
+    color:#9ba0aa !important;
+  }
+
+  .wallet-modal-backdrop .wallet-modal.wallet-modal-premium > .close:hover{
+    color:#f4f5f7 !important;
+    background:#1a1d23 !important;
+  }
+`}</style>
+
+
+<style>{`
+  /* ============================================================
+     CASEX WALLET — CLEAN SHUFFLE-LIKE CRYPTO DEPOSIT
+     ============================================================ */
+  .wallet-modal-backdrop .casex-clean-crypto-deposit{
+    width:100% !important;
+    padding:4px 0 0 !important;
+    color:#f3f4f7 !important;
+  }
+
+  .wallet-modal-backdrop .casex-clean-crypto-row{
+    margin-bottom:14px !important;
+  }
+
+  .wallet-modal-backdrop .casex-clean-label{
+    display:block !important;
+    margin:0 0 6px !important;
+    color:#8b909a !important;
+    font-size:10px !important;
+    line-height:1 !important;
+    font-weight:850 !important;
+  }
+
+  .wallet-modal-backdrop .casex-clean-select,
+  .wallet-modal-backdrop .casex-clean-address{
+    min-height:48px !important;
+    width:100% !important;
+    box-sizing:border-box !important;
+    display:flex !important;
+    align-items:center !important;
+    gap:10px !important;
+    border:1px solid #30343d !important;
+    border-radius:9px !important;
+    background:#20232a !important;
+    padding:0 12px !important;
+  }
+
+  .wallet-modal-backdrop .casex-clean-select strong{
+    color:#f1f3f6 !important;
+    font-size:12px !important;
+    font-weight:800 !important;
+  }
+
+  .wallet-modal-backdrop .casex-clean-balance{
+    margin-left:auto !important;
+    color:#969ba5 !important;
+    font-size:10px !important;
+  }
+
+  .wallet-modal-backdrop .casex-clean-coin{
+    width:28px !important;
+    height:28px !important;
+    flex:0 0 28px !important;
+    display:grid !important;
+    place-items:center !important;
+    border-radius:50% !important;
+    background:#2a2e37 !important;
+    color:#fff !important;
+    font-size:11px !important;
+    font-weight:900 !important;
+  }
+
+  .wallet-modal-backdrop .casex-clean-address{
+    background:#191c22 !important;
+  }
+
+  .wallet-modal-backdrop .casex-clean-address code{
+    min-width:0 !important;
+    flex:1 1 auto !important;
+    overflow:hidden !important;
+    text-overflow:ellipsis !important;
+    white-space:nowrap !important;
+    color:#e8eaf0 !important;
+    font-size:11px !important;
+    font-weight:650 !important;
+  }
+
+  .wallet-modal-backdrop .casex-clean-icon-btn{
+    width:32px !important;
+    height:32px !important;
+    flex:0 0 32px !important;
+    border:0 !important;
+    border-radius:7px !important;
+    background:#2b2f38 !important;
+    color:#d8dbe1 !important;
+    cursor:pointer !important;
+    font-size:15px !important;
+  }
+
+  .wallet-modal-backdrop .casex-clean-icon-btn:hover{
+    background:#343945 !important;
+    color:#fff !important;
+  }
+
+  .wallet-modal-backdrop .casex-clean-warning{
+    display:flex !important;
+    align-items:center !important;
+    gap:8px !important;
+    margin:2px 0 14px !important;
+    padding:9px 11px !important;
+    border:1px solid rgba(235,122,83,.18) !important;
+    border-radius:8px !important;
+    background:rgba(130,56,35,.07) !important;
+    color:#e8a18a !important;
+  }
+
+  .wallet-modal-backdrop .casex-clean-warning span{
+    display:grid !important;
+    place-items:center !important;
+    width:18px !important;
+    height:18px !important;
+    flex:0 0 18px !important;
+    border:1px solid rgba(239,132,96,.35) !important;
+    border-radius:50% !important;
+    color:#ff9c79 !important;
+    font-size:10px !important;
+    font-weight:900 !important;
+  }
+
+  .wallet-modal-backdrop .casex-clean-warning strong{
+    color:#d99782 !important;
+    font-size:9px !important;
+    line-height:1.35 !important;
+    font-weight:750 !important;
+  }
+
+  .wallet-modal-backdrop .casex-clean-qr{
+    width:204px !important;
+    height:204px !important;
+    margin:4px auto 15px !important;
+    display:grid !important;
+    place-items:center !important;
+    padding:7px !important;
+    box-sizing:border-box !important;
+    border-radius:10px !important;
+    background:#fff !important;
+  }
+
+  .wallet-modal-backdrop .casex-clean-qr img{
+    width:190px !important;
+    height:190px !important;
+    display:block !important;
+  }
+
+  .wallet-modal-backdrop .casex-clean-deposit-meta{
+    display:grid !important;
+    grid-template-columns:1fr auto !important;
+    align-items:center !important;
+    gap:12px !important;
+    padding:12px 0 !important;
+    border-top:1px solid #2b3039 !important;
+    border-bottom:1px solid #2b3039 !important;
+  }
+
+  .wallet-modal-backdrop .casex-clean-deposit-meta > div:first-child span{
+    display:block !important;
+    margin-bottom:4px !important;
+    color:#838894 !important;
+    font-size:9px !important;
+    font-weight:800 !important;
+    text-transform:uppercase !important;
+    letter-spacing:.7px !important;
+  }
+
+  .wallet-modal-backdrop .casex-clean-deposit-meta > div:first-child strong{
+    display:block !important;
+    color:#f0f2f5 !important;
+    font-size:17px !important;
+    font-weight:900 !important;
+  }
+
+  .wallet-modal-backdrop .casex-clean-status{
+    display:flex !important;
+    align-items:center !important;
+    justify-content:flex-end !important;
+    gap:7px !important;
+    color:#969ba5 !important;
+    font-size:10px !important;
+    white-space:nowrap !important;
+  }
+
+  .wallet-modal-backdrop .casex-clean-status-dot{
+    width:7px !important;
+    height:7px !important;
+    border-radius:50% !important;
+    background:#a66cff !important;
+    box-shadow:0 0 8px rgba(166,108,255,.45) !important;
+  }
+
+  .wallet-modal-backdrop .casex-clean-status.success{
+    color:#65dca4 !important;
+  }
+
+  .wallet-modal-backdrop .casex-clean-status.success .casex-clean-status-dot{
+    background:#5de0a0 !important;
+    box-shadow:0 0 8px rgba(93,224,160,.35) !important;
+  }
+
+  .wallet-modal-backdrop .casex-clean-status.error{
+    color:#e98979 !important;
+  }
+
+  .wallet-modal-backdrop .casex-clean-status.error .casex-clean-status-dot{
+    background:#e98979 !important;
+    box-shadow:none !important;
+  }
+
+  .wallet-modal-backdrop .casex-clean-history-link{
+    display:block !important;
+    width:fit-content !important;
+    margin:13px auto 0 !important;
+    border:0 !important;
+    background:none !important;
+    color:#e9eaee !important;
+    font-size:11px !important;
+    font-weight:800 !important;
+    text-decoration:underline !important;
+    text-underline-offset:3px !important;
+    cursor:pointer !important;
+    padding:4px 6px !important;
+  }
+
+  .wallet-modal-backdrop .casex-clean-history-link:hover{
+    color:#ae75ff !important;
+  }
+
+  /* Make the modal itself closer to Shuffle's restrained palette. */
+  .wallet-modal-backdrop .wallet-modal.wallet-modal-premium{
+    width:min(540px,100%) !important;
+    max-width:540px !important;
+    border-color:#30343c !important;
+    background:#111318 !important;
+  }
+
+  .wallet-modal-backdrop .wallet-premium-header{
+    margin-bottom:16px !important;
+  }
+
+  @media(max-width:700px){
+    .wallet-modal-backdrop .casex-clean-qr{
+      width:184px !important;
+      height:184px !important;
+    }
+
+    .wallet-modal-backdrop .casex-clean-qr img{
+      width:170px !important;
+      height:170px !important;
+    }
+
+    .wallet-modal-backdrop .casex-clean-deposit-meta{
+      grid-template-columns:1fr !important;
+    }
+
+    .wallet-modal-backdrop .casex-clean-status{
+      justify-content:flex-start !important;
+    }
+  }
+`}</style>
+
+
+
+
+<style>{`
+  /* CASEX WALLET — live crypto switcher
+     One visual chevron + a full-size native select overlay so the arrow is clickable. */
+  .wallet-modal-backdrop .casex-clean-select-live{
+    position:relative !important;
+    overflow:hidden !important;
+    padding-right:0 !important;
+  }
+
+  .wallet-modal-backdrop .casex-clean-select-live::before{
+    content:"" !important;
+    display:block !important;
+    position:absolute !important;
+    right:12px !important;
+    top:50% !important;
+    width:7px !important;
+    height:7px !important;
+    margin-top:-5px !important;
+    border-right:1.5px solid #9da2ad !important;
+    border-bottom:1.5px solid #9da2ad !important;
+    transform:rotate(45deg) !important;
+    pointer-events:none !important;
+    z-index:3 !important;
+  }
+
+  .wallet-modal-backdrop .casex-clean-select-live::after{
+    content:none !important;
+    display:none !important;
+  }
+
+  .wallet-modal-backdrop .casex-clean-select-live select{
+    position:absolute !important;
+    inset:0 !important;
+    z-index:2 !important;
+    width:100% !important;
+    height:100% !important;
+    min-width:0 !important;
+    border:0 !important;
+    outline:0 !important;
+    box-shadow:none !important;
+    appearance:none !important;
+    -webkit-appearance:none !important;
+    -moz-appearance:none !important;
+    background:transparent !important;
+    background-image:none !important;
+    color:transparent !important;
+    font-size:12px !important;
+    cursor:pointer !important;
+    opacity:0 !important;
+  }
+
+  .wallet-modal-backdrop .casex-clean-select-live select option{
+    background:#1d2027 !important;
+    color:#f1f3f6 !important;
+    font-weight:700 !important;
+  }
+
+  .wallet-modal-backdrop .casex-clean-select-live select:disabled{
+    cursor:not-allowed !important;
+  }
+
+  .wallet-modal-backdrop .casex-clean-select-live:focus-within{
+    border-color:#30343d !important;
+    box-shadow:none !important;
+  }
+
+        /* CASEX WALLET — make the deposit address easier to read */
+        .wallet-modal-backdrop .casex-clean-address code{
+          color:#f5f6f8 !important;
+          font-size:12px !important;
+          font-weight:850 !important;
+          letter-spacing:.01em !important;
+          text-shadow:0 0 8px rgba(255,255,255,.04) !important;
+        }
+
+        .wallet-modal-backdrop .casex-clean-address{
+          background:#1b1e24 !important;
+          border-color:#383d47 !important;
+        }
+`}</style>
+
+      <style>{`
+        /* ============================================================
+           CASEX ORIGINAL GAMES — MATCH THE HOMEPAGE LAYOUT
+           The game page now uses the same sidebar proportions,
+           content gutters, header alignment and spacing as Home.
+           ============================================================ */
+
+        /* ----- Global header: same left-aligned brand treatment as Home ----- */
+        .casex-d4-game-nav .brand{
+          margin-left:236px !important;
+          gap:14px !important;
+        }
+
+        .casex-d4-game-nav .brand .brand-mark{
+          width:38px !important;
+          height:38px !important;
+          min-width:38px !important;
+          border-radius:10px !important;
+          font-size:17px !important;
+        }
+
+        .casex-d4-game-nav .brand > span{
+          font-size:20px !important;
+          line-height:1 !important;
+          font-weight:900 !important;
+          letter-spacing:-.02em !important;
+        }
+
+        /* ----- Game sidebar: copy the homepage sidebar geometry ----- */
+        .casex-d4-game-sidebar{
+          left:0 !important;
+          top:74px !important;
+          bottom:0 !important;
+          width:236px !important;
+          padding:18px 14px 16px !important;
+          border-right:1px solid rgba(92,84,125,.20) !important;
+          background:linear-gradient(180deg,rgba(10,11,17,.98),rgba(7,8,13,.98)) !important;
+          box-shadow:12px 0 32px rgba(0,0,0,.12) !important;
+          box-sizing:border-box !important;
+          overflow-y:auto !important;
+          overflow-x:hidden !important;
+        }
+
+        .casex-d4-game-sidebar.is-collapsed{
+          width:72px !important;
+          padding-left:10px !important;
+          padding-right:10px !important;
+        }
+
+        .casex-d4-game-sidebar-head{
+          align-items:center !important;
+          gap:10px !important;
+          padding:6px 8px 18px !important;
+          min-height:0 !important;
+        }
+
+        .casex-d4-game-sidebar-logo{
+          width:34px !important;
+          height:34px !important;
+          flex:0 0 34px !important;
+          border-radius:10px !important;
+          font-size:17px !important;
+        }
+
+        .casex-d4-game-sidebar-brand strong{
+          font-size:13px !important;
+          letter-spacing:.02em !important;
+        }
+
+        .casex-d4-game-sidebar-brand small{
+          font-size:7px !important;
+          letter-spacing:.18em !important;
+        }
+
+        .casex-d4-game-sidebar-label{
+          margin:10px 8px 7px !important;
+          font-size:7px !important;
+          letter-spacing:.18em !important;
+        }
+
+        .casex-d4-game-side-item,
+        .casex-d4-game-sidebar-back{
+          min-height:0 !important;
+          padding:10px 11px !important;
+          margin:0 !important;
+          gap:10px !important;
+          border:0 !important;
+          border-radius:9px !important;
+          font-size:10px !important;
+          font-weight:800 !important;
+        }
+
+        .casex-d4-game-side-icon{
+          width:28px !important;
+          height:28px !important;
+          flex:0 0 28px !important;
+          border-radius:9px !important;
+          font-size:14px !important;
+        }
+
+        /* ----- The game viewport sits beside the sidebar just like Home content ----- */
+        .casex-d4-original-game-stage{
+          position:fixed !important;
+          top:74px !important;
+          left:236px !important;
+          right:0 !important;
+          bottom:0 !important;
+          width:auto !important;
+          height:auto !important;
+          margin:0 !important;
+          padding:0 !important;
+          overflow-y:auto !important;
+          overflow-x:hidden !important;
+          background:
+            radial-gradient(circle at 75% 7%,rgba(127,75,221,.14),transparent 23%),
+            radial-gradient(circle at 16% 80%,rgba(56,77,156,.08),transparent 23%),
+            linear-gradient(180deg,#05060a 0%,#070812 47%,#05060a 100%) !important;
+          z-index:1200 !important;
+        }
+
+        .casex-d4-original-game-stage.sidebar-collapsed{
+          left:72px !important;
+        }
+
+        /* Kill the older full-viewport/fixed overlay geometry so the game
+           actually fills the available content column. */
+        .casex-d4-original-game-stage .original-games-overlay{
+          position:relative !important;
+          inset:auto !important;
+          left:auto !important;
+          right:auto !important;
+          top:auto !important;
+          bottom:auto !important;
+          width:100% !important;
+          max-width:none !important;
+          min-width:0 !important;
+          min-height:100% !important;
+          height:auto !important;
+          margin:0 !important;
+          overflow:visible !important;
+          background:
+            radial-gradient(circle at 75% 7%,rgba(127,75,221,.08),transparent 25%),
+            linear-gradient(180deg,#05060a 0%,#070812 50%,#05060a 100%) !important;
+        }
+
+        .casex-d4-original-game-stage .original-games-page{
+          width:100% !important;
+          max-width:none !important;
+          min-width:0 !important;
+          margin:0 !important;
+          min-height:100% !important;
+          background:transparent !important;
+          overflow:visible !important;
+        }
+
+        .casex-d4-original-game-stage .original-games-shell{
+          width:calc(100% - 56px) !important;
+          max-width:none !important;
+          min-width:0 !important;
+          margin:0 28px !important;
+          padding:34px 0 56px !important;
+          box-sizing:border-box !important;
+        }
+
+        /* Keep the game switcher in the same content gutter as homepage sections. */
+        .casex-d4-original-game-stage .original-games-game-tabs{
+          position:fixed !important;
+          left:258px !important;
+          top:84px !important;
+          z-index:999999 !important;
+          pointer-events:auto !important;
+        }
+
+        .casex-d4-original-game-stage.sidebar-collapsed .original-games-game-tabs{
+          left:94px !important;
+        }
+
+        /* The content/header spacing should feel like the Home page. */
+        .casex-d4-original-game-stage .original-games-heading{
+          margin-bottom:24px !important;
+        }
+
+        .casex-d4-original-game-stage .original-games-heading h1{
+          font-size:52px !important;
+          letter-spacing:-2.6px !important;
+        }
+
+        /* Preserve the special Towers visual, but keep it within the same
+           content column rather than bleeding across the viewport. */
+        .casex-d4-original-game-stage .original-games-towers-page{
+          width:100% !important;
+          min-width:0 !important;
+          max-width:none !important;
+          margin:0 !important;
+          overflow-x:hidden !important;
+        }
+
+        .casex-d4-original-game-stage .original-games-towers-page .original-games-shell{
+          width:calc(100% - 56px) !important;
+          max-width:none !important;
+          margin:0 28px !important;
+        }
+
+        @media(max-width:700px){
+          .casex-d4-game-nav .brand{
+            margin-left:0 !important;
+          }
+
+          .casex-d4-game-sidebar{
+            top:68px !important;
+            width:100% !important;
+            max-width:236px !important;
+          }
+
+          .casex-d4-game-sidebar.is-collapsed{
+            width:64px !important;
+          }
+
+          .casex-d4-original-game-stage{
+            top:68px !important;
+            left:236px !important;
+          }
+
+          .casex-d4-original-game-stage.sidebar-collapsed{
+            left:64px !important;
+          }
+
+          .casex-d4-original-game-stage .original-games-shell{
+            width:calc(100% - 32px) !important;
+            margin:0 16px !important;
+            padding:24px 0 42px !important;
+          }
+
+          .casex-d4-original-game-stage .original-games-game-tabs{
+            left:246px !important;
+            top:76px !important;
+          }
+
+          .casex-d4-original-game-stage.sidebar-collapsed .original-games-game-tabs{
+            left:74px !important;
+          }
+        }
+      
+
+
+        /* ============================================================
+           ORIGINAL GAME SIDEBAR — EXACT HOMEPAGE SIDEBAR
+           Reuse the homepage .casex-d4-sidebar styles instead of a
+           second, visually different sidebar implementation.
+           ============================================================ */
+
+        .casex-d4-game-shared-sidebar{
+          position:fixed !important;
+          left:0 !important;
+          top:74px !important;
+          bottom:0 !important;
+          width:214px !important;
+          box-sizing:border-box !important;
+          z-index:2600 !important;
+          transform:translateX(0) !important;
+          opacity:1 !important;
+          pointer-events:auto !important;
+        }
+
+        .casex-d4-game-shared-sidebar.game-sidebar-visible{
+          transform:translateX(0) !important;
+          opacity:1 !important;
+          pointer-events:auto !important;
+        }
+
+        .casex-d4-game-shared-sidebar.game-sidebar-collapsed{
+          transform:translateX(-102%) !important;
+          opacity:.98 !important;
+          pointer-events:none !important;
+        }
+
+        /* Match the homepage active treatment for the currently-open game. */
+        .casex-d4-game-shared-sidebar .casex-d4-side-game.active{
+          background:linear-gradient(
+            90deg,
+            rgba(115,67,204,.28),
+            rgba(75,40,130,.12)
+          ) !important;
+          color:#fff !important;
+          box-shadow:inset 2px 0 0 #a66eff !important;
+        }
+
+        /* On a game page, the content begins after the SAME sidebar width. */
+        .casex-d4-original-game-stage{
+          position:relative !important;
+          margin-left:214px !important;
+          width:calc(100% - 214px) !important;
+          max-width:none !important;
+          box-sizing:border-box !important;
+        }
+
+        .casex-d4-original-game-stage.sidebar-collapsed{
+          margin-left:0 !important;
+          width:100% !important;
+        }
+
+        @media(max-width:700px){
+          .casex-d4-game-shared-sidebar{
+            top:68px !important;
+            width:100% !important;
+            max-width:236px !important;
+          }
+
+          .casex-d4-original-game-stage{
+            margin-left:0 !important;
+            width:100% !important;
+          }
+
+          .casex-d4-game-shared-sidebar.game-sidebar-collapsed{
+            transform:translateX(-102%) !important;
+          }
+        }
+      
+      `}</style>
+
+      <style>{`
+        /* ============================================================
+           CASEX ORIGINAL GAMES — SINGLE SOURCE OF PAGE POSITIONING
+
+           The sidebar is fixed independently. The React wrapper around
+           OriginalGames must not contribute any width or margin.
+           The actual Originals overlay is the ONLY content-column offset.
+           ============================================================ */
+
+        /* 1. Remove the wrapper from layout entirely. */
+        .casex-d4-original-game-stage{
+          display:contents !important;
+        }
+
+        /* 2. Position the actual Originals viewport beside the homepage
+              sidebar. This is the ONE horizontal offset. */
+        .casex-d4-original-game-stage .original-games-overlay{
+          position:fixed !important;
+          top:74px !important;
+          right:0 !important;
+          bottom:0 !important;
+          left:214px !important;
+          inset:74px 0 0 214px !important;
+          width:auto !important;
+          height:auto !important;
+          min-height:0 !important;
+          max-width:none !important;
+          margin:0 !important;
+          padding:0 !important;
+          overflow-x:hidden !important;
+          overflow-y:auto !important;
+          box-sizing:border-box !important;
+          z-index:1200 !important;
+
+          background:
+            radial-gradient(circle at 18% 10%,rgba(133,77,239,.12),transparent 27%),
+            radial-gradient(circle at 82% 14%,rgba(63,86,210,.06),transparent 29%),
+            linear-gradient(180deg,#06070c 0%,#090a11 54%,#05060a 100%) !important;
+        }
+
+        /* These older selectors previously added another 214/236px shift.
+           Force them back to the canonical position. */
+        .casex-d4-original-game-stage.sidebar-open .original-games-overlay,
+        .casex-d4-original-game-stage.sidebar-collapsed .original-games-overlay{
+          left:214px !important;
+          right:0 !important;
+          width:auto !important;
+          margin:0 !important;
+        }
+
+        /* When the sidebar is collapsed, the content can use the full screen. */
+        .casex-d4-original-game-stage.sidebar-collapsed .original-games-overlay{
+          left:0 !important;
+          inset:74px 0 0 0 !important;
+        }
+
+        /* 3. Keep the actual game page itself at 100% of the viewport
+              created by the overlay. */
+        .casex-d4-original-game-stage .original-games-page{
+          position:relative !important;
+          width:100% !important;
+          min-width:0 !important;
+          max-width:none !important;
+          min-height:100% !important;
+          height:auto !important;
+          margin:0 !important;
+          padding:0 !important;
+          overflow:visible !important;
+          background:transparent !important;
+          box-sizing:border-box !important;
+        }
+
+        /* 4. Use the same broad content gutter as the redesigned Home page.
+              Do NOT add a second sidebar offset here. */
+        .casex-d4-original-game-stage .original-games-shell{
+          width:min(1440px,calc(100% - 48px)) !important;
+          max-width:1440px !important;
+          min-width:0 !important;
+          margin:0 auto !important;
+          padding:48px 0 80px !important;
+          box-sizing:border-box !important;
+        }
+
+        /* Towers uses the same shell as the other original games. */
+        .casex-d4-original-game-stage .original-games-towers-page{
+          width:100% !important;
+          min-width:0 !important;
+          max-width:none !important;
+          margin:0 !important;
+          overflow-x:hidden !important;
+          background:transparent !important;
+        }
+
+        .casex-d4-original-game-stage .original-games-towers-page .original-games-shell{
+          width:min(1440px,calc(100% - 48px)) !important;
+          max-width:1440px !important;
+          margin:0 auto !important;
+        }
+
+        /* 5. Game tabs are positioned ONCE under the global header.
+              They no longer inherit the stage's old offset. */
+        .casex-d4-original-game-stage .original-games-game-tabs{
+          position:fixed !important;
+          top:86px !important;
+          left:238px !important;
+          right:auto !important;
+          margin:0 !important;
+          z-index:999999 !important;
+          pointer-events:auto !important;
+        }
+
+        .casex-d4-original-game-stage.sidebar-collapsed .original-games-game-tabs{
+          left:24px !important;
+        }
+
+        /* Remove the legacy horizontal offset rules at every specificity
+           level used by the previous sidebar implementation. */
+        .casex-d4-original-game-stage.sidebar-open .original-games-game-tabs{
+          left:238px !important;
+        }
+
+        /* Prevent any game-specific wrapper from reintroducing a second
+           horizontal content column. */
+        .casex-d4-original-game-stage .original-games-layout,
+        .casex-d4-original-game-stage .coinflip-layout{
+          width:100% !important;
+          max-width:100% !important;
+          min-width:0 !important;
+          box-sizing:border-box !important;
+        }
+
+        @media(max-width:700px){
+          .casex-d4-original-game-stage .original-games-overlay,
+          .casex-d4-original-game-stage.sidebar-open .original-games-overlay,
+          .casex-d4-original-game-stage.sidebar-collapsed .original-games-overlay{
+            top:68px !important;
+            left:0 !important;
+            right:0 !important;
+            bottom:0 !important;
+            inset:68px 0 0 0 !important;
+          }
+
+          .casex-d4-original-game-stage .original-games-shell,
+          .casex-d4-original-game-stage .original-games-towers-page .original-games-shell{
+            width:calc(100% - 24px) !important;
+            max-width:none !important;
+            margin:0 12px !important;
+            padding:44px 0 60px !important;
+          }
+
+          .casex-d4-original-game-stage .original-games-game-tabs,
+          .casex-d4-original-game-stage.sidebar-open .original-games-game-tabs,
+          .casex-d4-original-game-stage.sidebar-collapsed .original-games-game-tabs{
+            left:12px !important;
+            top:76px !important;
+          }
+        }
+      /* ============================================================
+         CASEX ORIGINAL GAMES — COLOR DICING SHARED FRAME
+         Uses the latest homepage-matched game sidebar already present
+         in this main.jsx. No second sidebar or old integration is added.
+         ============================================================ */
+
+      .casex-d4-original-game-stage .casex-d4-dicing-overlay{
+        /* Match Mines/Towers/Plinko/Chicken/Coinflip: the game overlay
+           itself owns the vertical scroll. The wrapper is display:contents. */
+        position:fixed !important;
+        top:74px !important;
+        right:0 !important;
+        bottom:0 !important;
+        left:214px !important;
+        inset:74px 0 0 214px !important;
+        width:auto !important;
+        max-width:none !important;
+        min-width:0 !important;
+        min-height:0 !important;
+        height:auto !important;
+        margin:0 !important;
+        padding:0 !important;
+        overflow-y:auto !important;
+        overflow-x:hidden !important;
+        scrollbar-width:thin !important;
+        scrollbar-color:rgba(157,108,255,.48) transparent !important;
+        background:transparent !important;
+        box-sizing:border-box !important;
+      }
+
+      .casex-d4-original-game-stage .casex-d4-dicing-overlay::-webkit-scrollbar{
+        width:8px !important;
+      }
+
+      .casex-d4-original-game-stage .casex-d4-dicing-overlay::-webkit-scrollbar-track{
+        background:transparent !important;
+      }
+
+      .casex-d4-original-game-stage .casex-d4-dicing-overlay::-webkit-scrollbar-thumb{
+        background:linear-gradient(180deg,rgba(157,108,255,.62),rgba(112,66,210,.48)) !important;
+        border:2px solid transparent !important;
+        background-clip:padding-box !important;
+        border-radius:999px !important;
+      }
+
+      .casex-d4-original-game-stage .casex-d4-dicing-overlay::-webkit-scrollbar-thumb:hover{
+        background:linear-gradient(180deg,rgba(173,122,255,.78),rgba(125,75,226,.66)) !important;
+        border:2px solid transparent !important;
+        background-clip:padding-box !important;
+      }
+
+      /* Collapsed sidebar = full-width game viewport, same as every other
+         Original Game. */
+      .casex-d4-original-game-stage.sidebar-collapsed .casex-d4-dicing-overlay{
+        left:0 !important;
+        inset:74px 0 0 0 !important;
+      }
+
+      .casex-d4-dicing-tabs{
+        position:fixed !important;
+        top:86px !important;
+        left:256px !important;
+        right:auto !important;
+        z-index:999999 !important;
+        margin:0 !important;
+        pointer-events:auto !important;
+      }
+
+      .casex-d4-original-game-stage.sidebar-collapsed .casex-d4-dicing-tabs{
+        left:24px !important;
+      }
+
+      .casex-d4-dicing-content{
+        width:100% !important;
+        min-width:0 !important;
+        box-sizing:border-box !important;
+        padding:48px 24px 80px !important;
+      }
+
+      .casex-d4-dicing-content .color-dicing-page-wrap{
+        width:100% !important;
+        min-height:0 !important;
+        margin:0 !important;
+        padding:0 !important;
+        background:transparent !important;
+        box-sizing:border-box !important;
+      }
+
+      .casex-d4-dicing-content .color-dicing-back{
+        display:none !important;
+      }
+
+      .casex-d4-dicing-content .color-dicing-page{
+        width:min(1180px,100%) !important;
+        max-width:1180px !important;
+        margin:0 auto !important;
+        padding:0 !important;
+        box-sizing:border-box !important;
+      }
+
+      .casex-d4-dicing-content .color-dicing-shell{
+        width:100% !important;
+        max-width:none !important;
+        box-sizing:border-box !important;
+      }
+
+      @media(max-width:700px){
+        .casex-d4-dicing-tabs{
+          left:204px !important;
+          top:76px !important;
+        }
+
+        .casex-d4-original-game-stage.sidebar-collapsed .casex-d4-dicing-tabs{
+          left:12px !important;
+        }
+
+        .casex-d4-dicing-overlay,
+        .casex-d4-original-game-stage.sidebar-open .casex-d4-dicing-overlay,
+        .casex-d4-original-game-stage.sidebar-collapsed .casex-d4-dicing-overlay{
+          top:68px !important;
+          left:0 !important;
+          right:0 !important;
+          bottom:0 !important;
+          inset:68px 0 0 0 !important;
+        }
+
+        .casex-d4-dicing-content{
+          padding:44px 12px 60px !important;
+        }
+
+        .casex-d4-dicing-content .color-dicing-page{
+          width:100% !important;
+          max-width:none !important;
+        }
+      }
+
+        /* ============================================================
+           CASEX COLOR DICING — MY BETS + NO HOMEPAGE UNDERFLOW
+           ============================================================ */
+
+        .casex-color-dicing-my-bets{
+          width:min(1180px,calc(100% - 48px));
+          max-width:1180px;
+          margin:34px auto 0;
+          box-sizing:border-box;
+          border:1px solid rgba(133,101,190,.22);
+          border-radius:16px;
+          background:
+            linear-gradient(180deg,rgba(19,21,32,.96),rgba(7,9,14,.98));
+          box-shadow:0 18px 60px rgba(0,0,0,.24);
+          overflow:hidden;
+        }
+
+        .casex-color-dicing-my-bets-head{
+          min-height:62px;
+          padding:10px 16px;
+          display:flex;
+          align-items:center;
+          justify-content:space-between;
+          gap:16px;
+          border-bottom:1px solid rgba(255,255,255,.055);
+          box-sizing:border-box;
+        }
+
+        .casex-color-dicing-my-bets-tab{
+          min-height:42px;
+          padding:0 20px;
+          display:flex;
+          align-items:center;
+          justify-content:center;
+          border-radius:10px;
+          color:#fff;
+          background:rgba(37,42,58,.94);
+          font-size:14px;
+          font-weight:950;
+        }
+
+        .casex-color-dicing-my-bets-head > span{
+          color:#707486;
+          font-size:8px;
+          font-weight:950;
+          letter-spacing:1.5px;
+        }
+
+        .casex-color-dicing-my-bets-table-wrap{
+          width:100%;
+          overflow-x:auto;
+        }
+
+        .casex-color-dicing-my-bets-table{
+          min-width:760px;
+        }
+
+        .casex-color-dicing-my-bets-row{
+          display:grid;
+          grid-template-columns:1.4fr 1.05fr 1fr 1fr 1.15fr;
+          align-items:center;
+          min-height:62px;
+          padding:0 24px;
+          gap:18px;
+          box-sizing:border-box;
+          color:#9ca0b0;
+          font-size:10px;
+          font-weight:800;
+          border-bottom:1px solid rgba(255,255,255,.045);
+        }
+
+        .casex-color-dicing-my-bets-row:last-child{
+          border-bottom:0;
+        }
+
+        .casex-color-dicing-my-bets-head-row{
+          min-height:44px;
+          color:#6f7382;
+          font-size:8px;
+          font-weight:950;
+          letter-spacing:.7px;
+          text-transform:uppercase;
+        }
+
+        .casex-color-dicing-my-bets-game{
+          display:flex;
+          align-items:center;
+          gap:10px;
+          color:#ece9f4;
+          font-size:11px;
+          font-weight:950;
+        }
+
+        .casex-color-dicing-my-bets-game b{
+          width:30px;
+          height:30px;
+          display:grid;
+          place-items:center;
+          flex:0 0 30px;
+          border-radius:8px;
+          background:rgba(126,75,220,.16);
+          font-size:14px;
+        }
+
+        .casex-color-dicing-my-bets-multiplier{
+          font-size:11px;
+          font-weight:1000;
+        }
+
+        .casex-color-dicing-my-bets-multiplier.win,
+        .casex-color-dicing-my-bets-payout.win{
+          color:#59e8ab;
+        }
+
+        .casex-color-dicing-my-bets-multiplier.loss{
+          color:#ff6d86;
+        }
+
+        .casex-color-dicing-my-bets-payout{
+          color:#8f95a7;
+          font-size:11px;
+          font-weight:950;
+        }
+
+        .casex-color-dicing-view-result{
+          min-width:104px;
+          min-height:36px;
+          padding:0 15px;
+          border:1px solid rgba(157,111,255,.38);
+          border-radius:9px;
+          background:linear-gradient(
+            100deg,
+            rgba(111,58,211,.25),
+            rgba(164,106,255,.18)
+          );
+          color:#d8c8ff;
+          font-size:10px;
+          font-weight:1000;
+          cursor:pointer;
+        }
+
+        .casex-color-dicing-view-result:hover{
+          border-color:rgba(178,139,255,.72);
+          background:linear-gradient(
+            100deg,
+            rgba(117,65,212,.42),
+            rgba(164,106,255,.32)
+          );
+          color:#fff;
+        }
+
+        .casex-color-dicing-my-bets-empty{
+          min-height:140px;
+          display:grid;
+          place-items:center;
+          padding:28px;
+          color:#75798b;
+          font-size:11px;
+          font-weight:800;
+          text-align:center;
+        }
+
+        .casex-color-dicing-result-modal-backdrop{
+          position:fixed;
+          inset:0;
+          z-index:1800;
+          display:grid;
+          place-items:center;
+          padding:28px;
+          background:rgba(2,3,8,.78);
+          backdrop-filter:blur(12px);
+        }
+
+        .casex-color-dicing-result-modal{
+          width:min(680px,100%);
+          max-height:min(780px,calc(100vh - 56px));
+          overflow:auto;
+          position:relative;
+          padding:24px;
+          border:1px solid rgba(136,103,196,.36);
+          border-radius:16px;
+          background:
+            linear-gradient(180deg,rgba(20,22,32,.98),rgba(7,9,14,.99));
+          box-shadow:0 28px 90px rgba(0,0,0,.48);
+          box-sizing:border-box;
+        }
+
+        .casex-color-dicing-result-modal-head{
+          display:flex;
+          align-items:flex-start;
+          justify-content:space-between;
+          gap:16px;
+          margin-bottom:22px;
+        }
+
+        .casex-color-dicing-result-modal-head h2{
+          margin:5px 0 0;
+          color:#fff;
+          font-size:28px;
+          font-weight:1000;
+          letter-spacing:-.8px;
+        }
+
+        .casex-color-dicing-result-modal-close{
+          width:38px;
+          height:38px;
+          border:1px solid rgba(255,255,255,.09);
+          border-radius:10px;
+          background:rgba(255,255,255,.03);
+          color:#a7aab7;
+          font-size:24px;
+          line-height:1;
+          cursor:pointer;
+        }
+
+        .casex-color-dicing-result-meta{
+          display:grid;
+          grid-template-columns:repeat(4,1fr);
+          gap:10px;
+          margin-bottom:20px;
+        }
+
+        .casex-color-dicing-result-meta > div{
+          min-height:70px;
+          padding:12px;
+          border:1px solid rgba(255,255,255,.055);
+          border-radius:10px;
+          background:rgba(255,255,255,.025);
+          display:flex;
+          flex-direction:column;
+          justify-content:center;
+          gap:4px;
+          box-sizing:border-box;
+        }
+
+        .casex-color-dicing-result-meta span{
+          color:#73788a;
+          font-size:8px;
+          font-weight:900;
+          letter-spacing:1px;
+          text-transform:uppercase;
+        }
+
+        .casex-color-dicing-result-meta strong{
+          color:#fff;
+          font-size:13px;
+          font-weight:950;
+        }
+
+        .casex-color-dicing-result-meta strong.win{
+          color:#59e8ab;
+        }
+
+        .casex-color-dicing-result-meta strong.loss{
+          color:#ff6d86;
+        }
+
+        .casex-color-dicing-result-dice{
+          display:grid;
+          grid-template-columns:repeat(4,1fr);
+          gap:10px;
+          margin-bottom:20px;
+        }
+
+        .casex-color-dicing-result-die{
+          min-height:100px;
+          border:1px solid rgba(255,255,255,.07);
+          border-radius:12px;
+          background:linear-gradient(
+            145deg,
+            color-mix(in srgb,var(--result-die-color) 18%,#11141d),
+            #0b0d14
+          );
+          display:flex;
+          flex-direction:column;
+          align-items:center;
+          justify-content:center;
+          gap:8px;
+        }
+
+        .casex-color-dicing-result-die > span{
+          width:30px;
+          height:30px;
+          border-radius:50%;
+          background:var(--result-die-color);
+          box-shadow:
+            0 0 0 7px color-mix(in srgb,var(--result-die-color) 14%,transparent),
+            0 10px 24px color-mix(in srgb,var(--result-die-color) 18%,transparent);
+        }
+
+        .casex-color-dicing-result-die small{
+          color:#8f94a4;
+          font-size:8px;
+          font-weight:900;
+          text-transform:uppercase;
+        }
+
+        .casex-color-dicing-result-status{
+          min-height:58px;
+          padding:0 16px;
+          border-radius:10px;
+          display:flex;
+          align-items:center;
+          justify-content:space-between;
+          gap:15px;
+          box-sizing:border-box;
+        }
+
+        .casex-color-dicing-result-status.win{
+          background:rgba(36,190,133,.08);
+          color:#59e8ab;
+        }
+
+        .casex-color-dicing-result-status.loss{
+          background:rgba(255,72,107,.08);
+          color:#ff6d86;
+        }
+
+        .casex-color-dicing-result-status strong{
+          font-size:12px;
+          font-weight:1000;
+          letter-spacing:1px;
+        }
+
+        .casex-color-dicing-result-status span{
+          font-size:10px;
+          font-weight:850;
+        }
+
+        @media(max-width:900px){
+          .casex-color-dicing-my-bets{
+            width:calc(100% - 24px);
+            margin-top:26px;
+          }
+        }
+
+        @media(max-width:600px){
+          .casex-color-dicing-my-bets-head{
+            min-height:54px;
+            padding:8px 10px;
+          }
+
+          .casex-color-dicing-my-bets-tab{
+            min-height:38px;
+            padding:0 16px;
+            font-size:13px;
+          }
+
+          .casex-color-dicing-my-bets-row{
+            min-height:54px;
+            padding:0 14px;
+            gap:12px;
+            font-size:10px;
+          }
+
+          .casex-color-dicing-my-bets-head-row{
+            min-height:40px;
+            font-size:8px;
+          }
+
+          .casex-color-dicing-view-result{
+            min-width:88px;
+            min-height:32px;
+            padding:0 12px;
+            font-size:9px;
+          }
+
+          .casex-color-dicing-result-modal-backdrop{
+            padding:14px;
+          }
+
+          .casex-color-dicing-result-meta{
+            grid-template-columns:repeat(2,1fr);
+          }
+
+          .casex-color-dicing-result-dice{
+            grid-template-columns:repeat(2,1fr);
+          }
+        }
+      `}</style>
+
+      <style>{`
+        /* ============================================================
+           CASEX COLOR DICING — SIDEBAR BRAND FIX
+           Keep the real sidebar CASEX header when the sidebar is open.
+           When the sidebar is closed, its header must not peek into the
+           Color Dicing game-switcher area.
+           ============================================================ */
+        /* The sidebar brand belongs to the real sidebar. Keep it visible
+           whenever the sidebar is open, including on Original Games. */
+        .casex-d4-global-sidebar.is-open .casex-d4-sidebar-head,
+        body.casex-global-sidebar-open .casex-d4-global-sidebar .casex-d4-sidebar-head{
+          display:flex !important;
+          visibility:visible !important;
+        }
+
+        /* When the sidebar is closed, remove the sidebar brand completely.
+           The body state is used as an additional guard so the old sidebar
+           header cannot leak into the game-switcher / Color Dicing area. */
+        .casex-d4-global-sidebar.is-closed .casex-d4-sidebar-head,
+        body.casex-global-sidebar-closed .casex-d4-global-sidebar .casex-d4-sidebar-head{
+          display:none !important;
+          visibility:hidden !important;
+          width:0 !important;
+          height:0 !important;
+          min-height:0 !important;
+          margin:0 !important;
+          padding:0 !important;
+          overflow:hidden !important;
+        }
+
+        /* ============================================================
+           CASEX COLOR DICING — FINAL SIDEBAR ALIGNMENT
+           Match the same broad content gutter used by the other
+           Original Games instead of centering inside a narrow 1180px
+           canvas. This keeps Dicing close to the open sidebar.
+           ============================================================ */
+        .casex-d4-dicing-content .color-dicing-page{
+          width:min(1440px,calc(100% - 48px)) !important;
+          max-width:1440px !important;
+          margin:0 auto !important;
+        }
+
+        @media(max-width:700px){
+          .casex-d4-dicing-content .color-dicing-page{
+            width:100% !important;
+            max-width:none !important;
+          }
+        }
+      `}</style>
+
+
+      <style>{`
+        /* ============================================================
+           ORIGINAL GAMES — USE THE EXACT HOME SIDEBAR BRAND
+           This is the existing CASEX / PLAY HUB header from the global
+           sidebar. Keep it in the first position, with the same spacing
+           as the Home page. No extra CASEX logo is created for Originals.
+           ============================================================ */
+        .casex-d4-global-sidebar.is-original-game.is-open .casex-d4-sidebar-head{
+          display:flex !important;
+          position:relative !important;
+          order:0 !important;
+          align-items:center !important;
+          gap:10px !important;
+          margin:0 !important;
+          padding:6px 8px 20px !important;
+          min-height:48px !important;
+          visibility:visible !important;
+          opacity:1 !important;
+        }
+
+        .casex-d4-global-sidebar.is-original-game.is-open .casex-d4-sidebar-logo{
+          width:36px !important;
+          height:36px !important;
+          flex:0 0 36px !important;
+          border-radius:11px !important;
+        }
+
+        .casex-d4-global-sidebar.is-original-game.is-open .casex-d4-sidebar-head + .casex-d4-side-label{
+          margin-top:13px !important;
+        }
+
+        /* Keep the Originals sidebar brand at the top, with the same clean
+           breathing room used on Home before the navigation begins. */
+        .casex-d4-global-sidebar.is-original-game.is-open{
+          padding-top:26px !important;
+        }
+
+        /* Do not create or expose any replacement brand in the game tab area. */
+        .casex-d4-original-game-stage .casex-d4-dicing-tabs .casex-d4-sidebar-head,
+        .casex-d4-original-game-stage .original-games-game-tabs .casex-d4-sidebar-head{
+          display:none !important;
+        }
+      `}</style>
+      <style>{`
+        /* ============================================================
+           CASEX HOMEPAGE — BRAINROT DEPOSIT PROMO
+           Promotes the existing Steal a Brainrot deposit flow.
+           ============================================================ */
+        .casex-brainrot-deposit-promo{position:relative !important;min-height:132px !important;margin:28px 0 34px !important;padding:20px 26px !important;display:flex !important;align-items:center !important;justify-content:space-between !important;gap:28px !important;overflow:hidden !important;box-sizing:border-box !important;border:1px solid rgba(157,116,255,.26) !important;border-radius:20px !important;background:radial-gradient(circle at 86% 50%,rgba(157,116,255,.18),transparent 27%),radial-gradient(circle at 18% 100%,rgba(84,55,156,.12),transparent 34%),linear-gradient(145deg,#11131d,#090b11 68%,#0c0913) !important;box-shadow:0 20px 55px rgba(0,0,0,.24),inset 0 1px 0 rgba(255,255,255,.025) !important;}
+        .casex-brainrot-deposit-promo::before{content:"" !important;position:absolute !important;inset:0 !important;pointer-events:none !important;background-image:linear-gradient(rgba(156,119,230,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(156,119,230,.035) 1px,transparent 1px) !important;background-size:34px 34px !important;mask-image:linear-gradient(90deg,#000 0%,rgba(0,0,0,.7) 62%,transparent 100%) !important;}
+        .casex-brainrot-deposit-copy{position:relative !important;z-index:2 !important;min-width:0 !important;max-width:760px !important;}
+        .casex-brainrot-deposit-kicker{color:#a77bff !important;font-size:9px !important;font-weight:900 !important;letter-spacing:1.6px !important;text-transform:uppercase !important;}
+        .casex-brainrot-deposit-promo h2{margin:5px 0 5px !important;color:#f5f6fa !important;font-size:24px !important;line-height:1.08 !important;letter-spacing:-.8px !important;}
+        .casex-brainrot-deposit-promo p{margin:0 !important;max-width:670px !important;color:#858997 !important;font-size:11px !important;line-height:1.6 !important;}
+        .casex-brainrot-deposit-cta{position:relative !important;z-index:2 !important;display:inline-flex !important;align-items:center !important;justify-content:center !important;gap:9px !important;min-height:38px !important;margin-top:12px !important;padding:9px 13px !important;border:0 !important;border-radius:10px !important;background:linear-gradient(135deg,#9d6cff,#7042d2) !important;color:#fff !important;font-size:10px !important;font-weight:900 !important;cursor:pointer !important;box-shadow:0 12px 28px rgba(112,66,210,.24) !important;transition:transform .18s ease,box-shadow .18s ease,filter .18s ease !important;}
+        .casex-brainrot-deposit-cta:hover{transform:translateY(-1px) !important;box-shadow:0 16px 34px rgba(112,66,210,.34) !important;filter:brightness(1.04) !important;}
+        .casex-brainrot-deposit-art{position:relative !important;z-index:2 !important;flex:0 0 205px !important;width:205px !important;height:100px !important;display:flex !important;align-items:center !important;justify-content:center !important;}
+        .casex-brainrot-deposit-art img{position:relative !important;z-index:2 !important;width:182px !important;height:96px !important;object-fit:contain !important;filter:drop-shadow(0 18px 24px rgba(0,0,0,.42)) !important;transform:translateY(1px) rotate(-2deg) !important;}
+        .casex-brainrot-deposit-glow{position:absolute !important;left:50% !important;top:50% !important;width:180px !important;height:70px !important;transform:translate(-50%,-50%) !important;border-radius:50% !important;background:#8b5cf6 !important;opacity:.18 !important;filter:blur(32px) !important;}
+        @media(max-width:900px){.casex-brainrot-deposit-promo{min-height:148px !important;margin:24px 0 30px !important;padding:18px 20px !important}.casex-brainrot-deposit-promo h2{font-size:22px !important}.casex-brainrot-deposit-art{flex-basis:165px !important;width:165px !important}.casex-brainrot-deposit-art img{width:148px !important;height:82px !important}}
+        @media(max-width:700px){.casex-brainrot-deposit-promo{min-height:0 !important;margin:20px 0 26px !important;padding:18px !important;flex-direction:column !important;align-items:flex-start !important;gap:10px !important}.casex-brainrot-deposit-promo h2{font-size:21px !important}.casex-brainrot-deposit-promo p{font-size:10px !important}.casex-brainrot-deposit-art{width:100% !important;height:84px !important;flex:0 0 auto !important}.casex-brainrot-deposit-art img{width:150px !important;height:78px !important}}
+      `}</style>
+
+
     </div>
   );
 }

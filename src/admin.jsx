@@ -4,6 +4,8 @@ import React, {
   useState,
   useRef,
 } from "react";
+import AdminMarketplacePanel from "./AdminMarketplacePanel.jsx";
+import "./admin-mines-details.css";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:4000";
 
@@ -30,6 +32,11 @@ const rarityClass = (rarity) =>
 
 const money = (cents) =>
   `$${(Number(cents || 0) / 100).toFixed(2)}`;
+
+const GAME_OPTIONS = [
+  { slug: "steal-a-brainrot", name: "Steal a Brainrot", theme: "purple" },
+  { slug: "donutsmp", name: "DonutSMP", theme: "blue" },
+];
 
 const getPaymentDetails = (payment) => {
   const note = String(payment?.note || "").trim();
@@ -518,6 +525,8 @@ function Admin() {
   const [adminOpenings, setAdminOpenings] = useState([]);
   const [adminTransactions, setAdminTransactions] = useState([]);
   const [adminActivityTab, setAdminActivityTab] = useState("openings");
+  const [adminMinesDetail, setAdminMinesDetail] = useState(null);
+  const [adminMinesDetailLoading, setAdminMinesDetailLoading] = useState(false);
   const [adminActivitySearch, setAdminActivitySearch] = useState("");
   const [adminAccess, setAdminAccess] = useState(null);
   const [adminAccessLoading, setAdminAccessLoading] = useState(true);
@@ -581,6 +590,7 @@ const [creatorCommissionUpdating, setCreatorCommissionUpdating] = useState(false
   const [newCase, setNewCase] = useState({
     name: "",
     price: "",
+    gameSlug: "steal-a-brainrot",
   });
 
   const [newItem, setNewItem] = useState({
@@ -588,6 +598,7 @@ const [creatorCommissionUpdating, setCreatorCommissionUpdating] = useState(false
     rarity: "Common",
     value: "",
     imageUrl: "",
+    gameSlug: "steal-a-brainrot",
   });
 
   const [rewardForm, setRewardForm] = useState({
@@ -599,6 +610,7 @@ const [editingCase, setEditingCase] = useState({
   name: "",
   price: "",
   imageUrl: "",
+  gameSlug: "steal-a-brainrot",
 });
 
   const [caseSearch, setCaseSearch] = useState("");
@@ -828,6 +840,7 @@ setEditingCase({
     Number(data.case.price_cents || 0) / 100
   ).toFixed(2),
   imageUrl: data.case.image_url || "",
+  gameSlug: data.case.game_slug || "steal-a-brainrot",
 });
     } catch (err) {
       console.error(err);
@@ -1351,6 +1364,33 @@ setEditingCase({
     } catch (err) {
       console.error(err);
       setError(err.message);
+    }
+  };
+
+  const loadAdminMinesDetail = async (transaction) => {
+    if (!transaction || String(transaction.type || "") !== "mines_bet") return;
+
+    setAdminMinesDetailLoading(true);
+    setAdminMinesDetail(null);
+
+    try {
+      const response = await apiFetch(
+        `${API}/api/admin/mines/transaction/${transaction.id}`
+      );
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(
+          data.error || data.message || "Failed to load Mines game details"
+        );
+      }
+
+      setAdminMinesDetail(data.game || null);
+    } catch (err) {
+      console.error("Admin Mines detail load failed:", err);
+      setError(err.message);
+    } finally {
+      setAdminMinesDetailLoading(false);
     }
   };
 
@@ -2470,6 +2510,7 @@ setSuccess(
           body: JSON.stringify({
             name: newCase.name.trim(),
             priceCents: Math.round(price * 100),
+            gameSlug: newCase.gameSlug,
           }),
         }
       );
@@ -2485,6 +2526,7 @@ setSuccess(
       setNewCase({
         name: "",
         price: "",
+        gameSlug: "steal-a-brainrot",
       });
 
       setShowCreateCase(false);
@@ -2538,6 +2580,7 @@ body: JSON.stringify({
   name: editingCase.name.trim(),
   priceCents: Math.round(price * 100),
   imageUrl: editingCase.imageUrl.trim() || null,
+  gameSlug: editingCase.gameSlug,
 }),
         }
       );
@@ -2868,6 +2911,7 @@ body: JSON.stringify({
               value * 100
             ),
             imageUrl: newItem.imageUrl.trim() || null,
+            gameSlug: newItem.gameSlug,
           }),
         }
       );
@@ -2886,6 +2930,7 @@ body: JSON.stringify({
         rarity: "Common",
         value: "",
         imageUrl: "",
+        gameSlug: "steal-a-brainrot",
       });
 
       setShowCreateItem(false);
@@ -3097,6 +3142,7 @@ body: JSON.stringify({
         body: JSON.stringify({
           name: `${selectedCase.name} Copy`,
           priceCents: Number(selectedCase.price_cents),
+          gameSlug: selectedCase.game_slug || "steal-a-brainrot",
         }),
       });
 
@@ -3144,11 +3190,14 @@ body: JSON.stringify({
       )
     );
 
+    const selectedGame = selectedCase?.game_slug || "steal-a-brainrot";
+
     return items.filter(
       (item) =>
-        !existingIds.has(Number(item.id))
+        !existingIds.has(Number(item.id)) &&
+        String(item.game_slug || "steal-a-brainrot") === selectedGame
     );
-  }, [items, caseItems]);
+  }, [items, caseItems, selectedCase?.game_slug]);
 
   if (adminAccessLoading || loading) {
     return (
@@ -3264,6 +3313,9 @@ body: JSON.stringify({
              </button>
 <button type="button" className={adminView === "cases" ? "admin-sidebar-item active" : "admin-sidebar-item"} onClick={() => setAdminView("cases")}>
               <span className="admin-sidebar-icon">▣</span><span>Cases</span>
+            </button>
+            <button type="button" className={adminView === "marketplace" ? "admin-sidebar-item active" : "admin-sidebar-item"} onClick={() => setAdminView("marketplace")}>
+              <span className="admin-sidebar-icon">◈</span><span>Marketplace</span>
             </button>
            <button
   type="button"
@@ -3708,6 +3760,7 @@ body: JSON.stringify({
             </div>
             <div className="admin-management-tabs">
               <button className={adminView === "cases" ? "active" : ""} onClick={() => setAdminView("cases")}>Cases</button>
+              <button className={adminView === "marketplace" ? "active" : ""} onClick={() => setAdminView("marketplace")}>Marketplace</button>
               <button className={adminView === "users" ? "active" : ""} onClick={() => { setAdminView("users"); loadAdminUsers(); }}>Users</button>
               <button className={adminView === "activity" ? "active" : ""} onClick={() => { setAdminView("activity"); loadAdminActivity(); }}>Activity</button>
             </div>
@@ -3989,9 +4042,9 @@ body: JSON.stringify({
                   ) : (
                     <div className="admin-activity-table-wrap">
                       <table className="admin-activity-table">
-                        <thead><tr><th>User</th><th>Type</th><th>Amount</th><th>Reference</th><th>Date</th></tr></thead>
+                        <thead><tr><th>User</th><th>Type</th><th>Amount</th><th>Reference</th><th>Date</th><th>Actions</th></tr></thead>
                         <tbody>
-                          {adminTransactions.length === 0 ? <tr><td colSpan="5" className="admin-table-empty">No transactions found.</td></tr> : adminTransactions.map((tx) => {
+                          {adminTransactions.length === 0 ? <tr><td colSpan="6" className="admin-table-empty">No transactions found.</td></tr> : adminTransactions.map((tx) => {
                             const amount = Number(tx.amount_cents || 0);
                             const label = String(tx.type || "transaction").replaceAll("_", " ");
                             return (
@@ -4001,6 +4054,20 @@ body: JSON.stringify({
                                 <td className={amount >= 0 ? "admin-table-positive" : "admin-table-negative"}>{amount >= 0 ? "+" : "-"}{money(Math.abs(amount))}</td>
                                 <td className="admin-table-muted">{tx.reference || "—"}</td>
                                 <td className="admin-table-muted">{new Date(tx.created_at).toLocaleString()}</td>
+                                <td>
+                                  {String(tx.type || "") === "mines_bet" ? (
+                                    <button
+                                      type="button"
+                                      className="admin-secondary-button admin-mines-view-button"
+                                      onClick={() => loadAdminMinesDetail(tx)}
+                                      disabled={adminMinesDetailLoading}
+                                    >
+                                      View game
+                                    </button>
+                                  ) : (
+                                    <span className="admin-table-muted">—</span>
+                                  )}
+                                </td>
                               </tr>
                             );
                           })}
@@ -5644,7 +5711,7 @@ body: JSON.stringify({
                 <h2>Case Assets</h2>
                 <p>Manage reusable reward assets that can be placed into any case.</p>
               </div>
-              <button className="admin-primary-button" onClick={() => { setNewItem({ name: "", rarity: "Common", value: "", imageUrl: "" }); setShowCreateItem(true); }}>+ Add Asset</button>
+              <button className="admin-primary-button" onClick={() => { setNewItem({ name: "", rarity: "Common", value: "", imageUrl: "", gameSlug: "steal-a-brainrot" }); setShowCreateItem(true); }}>+ Add Asset</button>
             </div>
             <div className="admin-management-body">
               <div className="admin-management-toolbar">
@@ -5723,6 +5790,8 @@ body: JSON.stringify({
             </div>
           </section>
         )}
+
+        {adminView === "marketplace" && <AdminMarketplacePanel />}
 
         {adminView === "cases" && (
         <div className="admin-layout">
@@ -5905,6 +5974,7 @@ body: JSON.stringify({
                       </strong>
 
                       <span>
+                        <span className={`admin-game-badge ${item.game_theme === "blue" ? "blue" : "purple"}`}>{item.game_name || item.game_slug || "Game"}</span>
                         {money(
                           item.price_cents
                         )}{" "}
@@ -6116,6 +6186,27 @@ body: JSON.stringify({
                           )
                         }
                       />
+                    </label>
+
+                    <label>
+                      <span>Game</span>
+
+                      <select
+                        value={editingCase.gameSlug}
+                        onChange={(event) =>
+                          setEditingCase((current) => ({
+                            ...current,
+                            gameSlug: event.target.value,
+                          }))
+                        }
+                        disabled={saving}
+                      >
+                        {GAME_OPTIONS.map((game) => (
+                          <option key={game.slug} value={game.slug}>
+                            {game.name}
+                          </option>
+                        ))}
+                      </select>
                     </label>
 
                     <label>
@@ -6610,6 +6701,25 @@ body: JSON.stringify({
               rewards.
             </p>
 
+            <label>
+              <span>Game</span>
+              <select
+                value={newCase.gameSlug}
+                onChange={(event) =>
+                  setNewCase((current) => ({
+                    ...current,
+                    gameSlug: event.target.value,
+                  }))
+                }
+              >
+                {GAME_OPTIONS.map((game) => (
+                  <option key={game.slug} value={game.slug}>
+                    {game.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+
             <form
               onSubmit={createCase}
               className="admin-modal-form"
@@ -7094,6 +7204,26 @@ body: JSON.stringify({
               </label>
 
               <label>
+                <span>Game</span>
+
+                <select
+                  value={newItem.gameSlug}
+                  onChange={(event) =>
+                    setNewItem((current) => ({
+                      ...current,
+                      gameSlug: event.target.value,
+                    }))
+                  }
+                >
+                  {GAME_OPTIONS.map((game) => (
+                    <option key={game.slug} value={game.slug}>
+                      {game.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label>
                 <span>Rarity</span>
 
                 <select
@@ -7345,6 +7475,81 @@ body: JSON.stringify({
           </div>
         </div>
       )}
+      {adminMinesDetail && (
+        <div
+          className="admin-modal-backdrop admin-mines-detail-backdrop"
+          onMouseDown={() => setAdminMinesDetail(null)}
+        >
+          <div
+            className="admin-modal admin-mines-detail-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="admin-mines-detail-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="admin-modal-head">
+              <div>
+                <div className="admin-eyebrow">MINES GAME DETAILS</div>
+                <h3 id="admin-mines-detail-title">Mines Game #{adminMinesDetail.gameId}</h3>
+              </div>
+              <button
+                type="button"
+                className="admin-modal-close"
+                onClick={() => setAdminMinesDetail(null)}
+                aria-label="Close Mines details"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="admin-mines-detail-summary">
+              <div><span>USER</span><strong>{adminMinesDetail.username}</strong></div>
+              <div><span>BET</span><strong>{money(adminMinesDetail.betCents)}</strong></div>
+              <div><span>GRID</span><strong>{adminMinesDetail.gridSize} × {adminMinesDetail.gridSize}</strong></div>
+              <div><span>MINES</span><strong>{adminMinesDetail.mineCount}</strong></div>
+              <div><span>TILES CLICKED</span><strong>{adminMinesDetail.revealedCount}</strong></div>
+              <div><span>RESULT</span><strong className={adminMinesDetail.status === "lost" ? "admin-mines-result-loss" : "admin-mines-result-win"}>{adminMinesDetail.status === "lost" ? "Hit Mine" : adminMinesDetail.status === "cashed_out" ? "Cashed Out" : String(adminMinesDetail.status || "Unknown")}</strong></div>
+              <div><span>MULTIPLIER</span><strong>{Number(adminMinesDetail.multiplier || 0).toFixed(2)}x</strong></div>
+              <div><span>PAYOUT</span><strong>{money(adminMinesDetail.payoutCents)}</strong></div>
+            </div>
+
+            <div className="admin-mines-board-wrap">
+              <div className="admin-mines-board-title">FINAL BOARD</div>
+              <div
+                className="admin-mines-detail-board"
+                style={{ gridTemplateColumns: `repeat(${Number(adminMinesDetail.gridSize || 5)}, minmax(0, 1fr))` }}
+              >
+                {Array.from({ length: Number(adminMinesDetail.gridSize || 5) ** 2 }, (_, index) => {
+                  const revealed = new Set((adminMinesDetail.revealedPositions || []).map(Number)).has(index);
+                  const mine = new Set((adminMinesDetail.minePositions || []).map(Number)).has(index);
+                  const clickedMine = mine && revealed;
+
+                  return (
+                    <div
+                      key={index}
+                      className={[
+                        "admin-mines-detail-tile",
+                        mine ? "mine" : "safe",
+                        revealed ? "revealed" : "hidden",
+                        clickedMine ? "clicked-mine" : "",
+                      ].filter(Boolean).join(" ")}
+                    >
+                      <span>{mine ? "✕" : revealed ? "✓" : "?"}</span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="admin-mines-board-legend">
+                <span><i className="safe-dot"></i> Revealed safe</span>
+                <span><i className="mine-dot"></i> Mine</span>
+                <span><i className="hidden-dot"></i> Not clicked</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {adminInventoryBulkModalOpen && selectedUser && (
         <div className="admin-modal-backdrop" onMouseDown={() => !adminInventoryBulkWorking && setAdminInventoryBulkModalOpen(false)}>
           <div

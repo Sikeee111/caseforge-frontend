@@ -1,0 +1,191 @@
+.admin-mines-view-button{
+  min-height:34px;
+  padding:8px 12px;
+  font-size:10px;
+}
+
+.admin-mines-detail-backdrop{
+  z-index:2500;
+}
+
+.admin-mines-detail-modal{
+  width:min(920px,calc(100vw - 32px));
+  max-height:min(90vh,900px);
+  overflow:auto;
+  padding:22px;
+  border:1px solid rgba(151,104,221,.48);
+  border-radius:20px;
+  background:
+    radial-gradient(circle at 50% 0%,rgba(127,80,226,.12),transparent 35%),
+    linear-gradient(145deg,#15131e,#08090f 76%);
+  box-shadow:0 30px 100px rgba(0,0,0,.58),0 0 60px rgba(112,67,211,.08);
+}
+
+.admin-mines-detail-modal .admin-modal-head{
+  margin-bottom:18px;
+}
+
+.admin-mines-detail-modal .admin-modal-head h3{
+  margin-top:6px;
+}
+
+.admin-mines-detail-summary{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:10px;
+  margin-bottom:18px;
+}
+
+.admin-mines-detail-summary > div{
+  min-height:68px;
+  padding:12px 14px;
+  border:1px solid rgba(255,255,255,.07);
+  border-radius:12px;
+  background:rgba(255,255,255,.025);
+}
+
+.admin-mines-detail-summary span{
+  display:block;
+  margin-bottom:6px;
+  color:#686b76;
+  font-size:8px;
+  font-weight:900;
+  letter-spacing:1.1px;
+}
+
+.admin-mines-detail-summary strong{
+  display:block;
+  color:#eceaf1;
+  font-size:13px;
+  font-weight:900;
+}
+
+.admin-mines-result-loss{ color:#ff858f !important; }
+.admin-mines-result-win{ color:#78e6a0 !important; }
+
+.admin-mines-board-wrap{
+  padding:16px;
+  border:1px solid rgba(255,255,255,.07);
+  border-radius:16px;
+  background:rgba(9,10,15,.74);
+}
+
+.admin-mines-board-title{
+  margin-bottom:12px;
+  color:#a67cf5;
+  font-size:9px;
+  font-weight:900;
+  letter-spacing:1.2px;
+}
+
+.admin-mines-detail-board{
+  width:min(560px,100%);
+  margin:0 auto;
+  display:grid;
+  gap:7px;
+  aspect-ratio:1/1;
+}
+
+.admin-mines-detail-tile{
+  position:relative;
+  display:grid;
+  place-items:center;
+  min-width:0;
+  min-height:0;
+  border:1px solid rgba(116,100,145,.24);
+  border-radius:9px;
+  background:linear-gradient(145deg,#13151e,#0c0e15);
+  box-shadow:inset 0 1px rgba(255,255,255,.02);
+}
+
+.admin-mines-detail-tile span{
+  font-size:clamp(12px,2.1vw,18px);
+  font-weight:950;
+}
+
+.admin-mines-detail-tile.hidden{
+  opacity:.48;
+}
+
+.admin-mines-detail-tile.safe.revealed{
+  border-color:rgba(120,230,160,.34);
+  background:linear-gradient(145deg,rgba(37,88,57,.28),rgba(14,28,21,.8));
+}
+
+.admin-mines-detail-tile.safe.revealed span{
+  color:#78e6a0;
+}
+
+.admin-mines-detail-tile.mine{
+  border-color:rgba(255,78,94,.4);
+  background:linear-gradient(145deg,rgba(110,26,39,.5),rgba(35,10,17,.9));
+}
+
+.admin-mines-detail-tile.mine span{
+  color:#ff858f;
+}
+
+.admin-mines-detail-tile.clicked-mine{
+  border-color:rgba(255,118,126,.9);
+  box-shadow:0 0 0 1px rgba(255,118,126,.18),0 0 24px rgba(255,67,89,.18);
+}
+
+.admin-mines-board-legend{
+  display:flex;
+  justify-content:center;
+  gap:20px;
+  flex-wrap:wrap;
+  margin-top:14px;
+  color:#787b88;
+  font-size:9px;
+  font-weight:800;
+}
+
+.admin-mines-board-legend span{
+  display:flex;
+  align-items:center;
+  gap:7px;
+}
+
+.admin-mines-board-legend i{
+  width:9px;
+  height:9px;
+  display:inline-block;
+  border-radius:3px;
+  border:1px solid rgba(255,255,255,.12);
+}
+
+.admin-mines-board-legend .safe-dot{ background:#2e6e47; border-color:#78e6a0; }
+.admin-mines-board-legend .mine-dot{ background:#7c2634; border-color:#ff858f; }
+.admin-mines-board-legend .hidden-dot{ background:#13151e; }
+
+@media(max-width:800px){
+  .admin-mines-detail-summary{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+}
+
+@media(max-width:520px){
+  .admin-mines-detail-modal{
+    width:calc(100vw - 18px);
+    padding:16px;
+  }
+
+  .admin-mines-detail-summary{
+    grid-template-columns:1fr 1fr;
+    gap:8px;
+  }
+
+  .admin-mines-detail-summary > div{
+    min-height:62px;
+    padding:10px 11px;
+  }
+
+  .admin-mines-board-wrap{
+    padding:10px;
+  }
+
+  .admin-mines-detail-board{
+    gap:4px;
+  }
+}
