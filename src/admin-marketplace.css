@@ -656,3 +656,70 @@
   object-position:center;
 }
 
+
+
+/* =========================================================
+   ACCEPTED DEPOSIT / MARKETPLACE CARD OVERLAP FIX
+   ========================================================= */
+.admin-marketplace-card{
+  grid-template-columns:88px minmax(0,1fr) 112px 156px;
+  gap:14px;
+}
+
+.admin-marketplace-card-body{
+  display:contents;
+}
+
+.admin-marketplace-card-copy{
+  min-width:0;
+  overflow:hidden;
+}
+
+.admin-marketplace-card-stats{
+  display:block;
+  min-width:0;
+}
+
+.admin-marketplace-card-stats>div{
+  width:100%;
+  min-width:0;
+  white-space:nowrap;
+}
+
+.admin-marketplace-card-actions{
+  min-width:0;
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  gap:6px;
+}
+
+.admin-marketplace-card-actions button{
+  flex:0 0 auto;
+  min-width:72px;
+}
+
+@media(max-width:1050px){
+  .admin-marketplace-card{
+    grid-template-columns:76px minmax(0,1fr) 100px 150px;
+    gap:10px;
+  }
+}
+
+@media(max-width:900px){
+  .admin-marketplace-card{
+    grid-template-columns:76px minmax(0,1fr);
+    gap:10px;
+  }
+
+  .admin-marketplace-card-stats{
+    display:block;
+    grid-column:2;
+    width:100%;
+  }
+
+  .admin-marketplace-card-actions{
+    grid-column:2;
+    justify-content:flex-start;
+  }
+}

@@ -1,0 +1,172 @@
+.game-portal-overlay{position:fixed;inset:0;z-index:250;background:radial-gradient(circle at 50% 0%,rgba(80,54,145,.18),transparent 35%),#07080d;overflow:auto;padding:92px 28px 32px}.game-portal-overlay.game-portal-theme-blue{background:radial-gradient(circle at 50% 0%,rgba(0,145,255,.2),transparent 36%),radial-gradient(circle at 85% 25%,rgba(0,200,255,.07),transparent 24%),#07090f}.game-portal-shell{width:min(1280px,100%);margin:0 auto}.game-portal-header{display:flex;justify-content:space-between;gap:24px;align-items:flex-start;margin-bottom:24px}.game-portal-brand-line{display:flex;gap:15px;align-items:flex-start}.game-portal-back{width:40px;height:40px;border:1px solid #2b2d38;border-radius:12px;background:#101119;color:#ddd;cursor:pointer;font-size:19px}.game-portal-kicker{display:block;color:#9d7bff;font-size:10px;font-weight:900;letter-spacing:1.8px;text-transform:uppercase}.game-portal-theme-blue .game-portal-kicker{color:#45b8ff}.game-portal-header h1{margin:5px 0 5px;font-size:38px;letter-spacing:-1.8px}.game-portal-header p{margin:0;color:#818593;font-size:12px}.game-portal-balance-card{min-width:160px;padding:13px 15px;border:1px solid #2b2d38;border-radius:14px;background:#0f1118;text-align:right}.game-portal-balance-card span{display:block;color:#6f7280;font-size:9px;letter-spacing:1.1px;font-weight:800}.game-portal-balance-card strong{display:block;margin-top:4px;font-size:20px}.game-portal-theme-blue .game-portal-balance-card{border-color:rgba(42,166,255,.32);box-shadow:0 0 35px rgba(0,157,255,.08)}.game-hub-layout{padding:26px;border:1px solid #242733;border-radius:24px;background:linear-gradient(160deg,#10121a,#0a0b10);box-shadow:0 25px 80px #0007}.game-hub-hero{text-align:center;max-width:760px;margin:0 auto 25px}.game-hub-hero h2{font-size:45px;margin:8px 0 8px;letter-spacing:-2px}.game-hub-hero p{margin:0;color:#7f8290}.game-hub-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}.game-hub-card{position:relative;overflow:hidden;text-align:left;padding:22px;border:1px solid #292c39;border-radius:20px;background:linear-gradient(160deg,#151724,#0b0c12);color:#fff;cursor:pointer;transition:.2s}.game-hub-card:hover{transform:translateY(-4px);border-color:#6a4fb0;box-shadow:0 22px 55px #0008}.game-hub-card.blue:hover{border-color:#168ff0;box-shadow:0 22px 55px rgba(0,123,255,.18)}.game-hub-card-glow{position:absolute;width:200px;height:200px;border-radius:50%;filter:blur(65px);right:-90px;top:-90px;background:#8b5cf6;opacity:.15}.game-hub-card.blue .game-hub-card-glow{background:#0ba5ff}.game-hub-card-top{display:flex;justify-content:space-between;align-items:center;position:relative}.game-hub-card-arrow{display:grid;place-items:center;width:35px;height:35px;border-radius:10px;background:#171927;border:1px solid #30334a;color:#fff}.game-portal-logo{object-fit:contain;display:block}.game-portal-logo-medium{width:50px;height:50px;border-radius:13px}.game-portal-logo-large{width:82px;height:82px;border-radius:20px}.brainrot-logo{display:grid;place-items:center;background:linear-gradient(135deg,#9f7cff,#6b47de);color:#fff;font-size:35px;box-shadow:0 0 30px rgba(139,92,246,.25)}.game-hub-card-copy{position:relative;margin-top:22px}.game-hub-card-copy h3{margin:7px 0 5px;font-size:23px}.game-hub-card-copy p{margin:0;color:#777b89;line-height:1.6;font-size:11px}.game-hub-card-footer{display:flex;gap:7px;flex-wrap:wrap;margin-top:20px}.game-hub-card-footer span{padding:5px 8px;border:1px solid #292c39;border-radius:7px;color:#8f93a1;font-size:9px}.coming-soon{cursor:default;opacity:.8}.coming-soon-icon{width:82px;height:82px;border-radius:20px;display:grid;place-items:center;border:1px solid #2e3240;background:#0f1118;color:#6e7382;font-size:34px}.game-portal-gamebar{display:flex;justify-content:space-between;gap:20px;align-items:center;margin-bottom:15px;padding:14px 16px;border:1px solid #292c39;border-radius:18px;background:#0e1017}.game-portal-theme-blue .game-portal-gamebar{border-color:rgba(37,150,255,.27);box-shadow:inset 0 0 40px rgba(0,126,255,.025)}.game-portal-game-identity{display:flex;gap:11px;align-items:center}.game-portal-game-identity strong{display:block;font-size:14px}.game-portal-game-identity span{display:block;color:#717583;font-size:10px;margin-top:3px}.game-portal-game-switcher{display:flex;gap:7px}.game-portal-game-switcher button,.game-portal-tabs button{border:1px solid #2a2c38;background:#11131b;color:#7e8290;border-radius:9px;padding:9px 12px;font-size:10px;font-weight:800}.game-portal-game-switcher button.active,.game-portal-theme-blue .game-portal-game-switcher button.active{background:rgba(139,92,246,.13);border-color:rgba(165,124,255,.5);color:#fff}.game-portal-theme-blue .game-portal-game-switcher button.active{background:rgba(0,157,255,.12);border-color:rgba(51,177,255,.55)}.game-portal-tabs{display:flex;gap:8px;margin-bottom:15px;overflow:auto}.game-portal-tabs button{min-width:max-content}.game-portal-tabs button.active{background:#a57cff;color:#fff;border-color:#a57cff;box-shadow:0 10px 30px rgba(139,92,246,.18)}.game-portal-theme-blue .game-portal-tabs button.active{background:#159cf0;border-color:#159cf0;box-shadow:0 10px 30px rgba(0,153,255,.2)}.game-portal-message{margin:0 0 14px;padding:10px 13px;border-radius:10px;border:1px solid rgba(74,222,128,.16);background:rgba(74,222,128,.05);color:#7de8a1;font-size:10px}.game-portal-section{padding:22px;border:1px solid #252833;border-radius:20px;background:linear-gradient(160deg,#11131b,#0b0c11)}.game-portal-section-head{display:flex;justify-content:space-between;gap:20px;align-items:end;margin-bottom:19px}.game-portal-section-head h2{margin:5px 0 4px;font-size:25px;letter-spacing:-1px}.game-portal-section-head p{margin:0;color:#777b89;font-size:10px}.game-portal-section-head input{width:240px;max-width:100%;border:1px solid #2b2e3a;background:#0e1017;color:#fff;border-radius:10px;padding:11px 13px;outline:none}.game-portal-count{padding:9px 11px;border:1px solid #2b2d39;border-radius:9px;color:#989cab;font-size:10px}.game-portal-item-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:13px}.game-portal-item-card{padding:14px;border:1px solid #292c38;border-radius:16px;background:linear-gradient(160deg,#131520,#0b0c11)}.game-portal-item-art{height:155px;border-radius:12px;border:1px solid #232631;background:radial-gradient(circle at 50% 35%,rgba(139,92,246,.12),transparent 50%),#090a10;display:grid;place-items:center;overflow:hidden}.game-portal-theme-blue .game-portal-item-art{background:radial-gradient(circle at 50% 35%,rgba(0,156,255,.12),transparent 50%),#090b11}.game-portal-item-art img{width:82%;height:82%;object-fit:contain}.game-portal-item-art span{font-size:46px;color:#716b83}.game-portal-item-rarity{display:inline-block;margin-top:10px;padding:4px 6px;border-radius:6px;background:#191622;color:#a68bff;font-size:8px;font-weight:900;text-transform:uppercase}.game-portal-theme-blue .game-portal-item-rarity{background:#101e2c;color:#55bfff}.game-portal-item-card h3{font-size:14px;margin:7px 0}.game-portal-item-meta{display:flex;justify-content:space-between;color:#6f7380;font-size:9px}.game-portal-item-buy{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:12px}.game-portal-item-buy strong{font-size:15px}.game-portal-item-buy button,.game-portal-primary{border:0;border-radius:9px;padding:9px 10px;background:#9d74ff;color:#fff;font-size:9px;font-weight:900}.game-portal-item-buy button:disabled{opacity:.4}.game-portal-theme-blue .game-portal-item-buy button,.game-portal-theme-blue .game-portal-primary{background:#139be8}.game-portal-empty{display:grid;place-items:center;min-height:250px;border:1px dashed #282b36;border-radius:15px;color:#707481;text-align:center;padding:25px}.game-portal-empty strong{display:block;color:#c5c8d2;font-size:12px}.game-portal-empty span{margin-top:6px;font-size:10px}.game-portal-case-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:13px}.game-portal-case-card{border:1px solid #292c38;border-radius:16px;background:#0d0f15;overflow:hidden}.game-portal-case-art{height:150px;display:grid;place-items:center;background:radial-gradient(circle at 50% 40%,rgba(139,92,246,.14),transparent 55%),#0a0b10}.game-portal-theme-blue .game-portal-case-art{background:radial-gradient(circle at 50% 40%,rgba(0,157,255,.14),transparent 55%),#0a0b10}.game-portal-case-art img{width:80%;height:80%;object-fit:contain}.game-portal-case-art span{font-size:55px}.game-portal-case-copy{display:flex;justify-content:space-between;align-items:center;padding:12px 13px}.game-portal-case-copy h3{margin:0;font-size:13px}.game-portal-case-copy strong{color:#b998ff;font-size:12px}.game-portal-theme-blue .game-portal-case-copy strong{color:#5fc1ff}.game-portal-case-card>button{width:calc(100% - 26px);margin:0 13px 13px;border:1px solid #303343;border-radius:9px;background:#151722;color:#fff;padding:10px;font-size:9px;font-weight:800}.game-portal-inventory-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}.game-portal-inventory-card{padding:11px;border:1px solid #292c38;border-radius:14px;background:#0d0f15;text-align:center}.game-portal-inventory-card .game-portal-item-art{height:125px}.game-portal-inventory-card strong{display:block;font-size:11px;margin-top:9px}.game-portal-inventory-card span{display:block;margin-top:4px;color:#777b89;font-size:9px}.game-portal-inventory-card b{display:block;margin-top:6px;color:#b99cff;font-size:11px}.game-portal-theme-blue .game-portal-inventory-card b{color:#54bfff}.game-portal-action-panel{min-height:390px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:34px;border:1px solid #292c38;border-radius:18px;background:radial-gradient(circle at 50% 35%,rgba(139,92,246,.12),transparent 36%),#0a0c12}.game-portal-theme-blue .game-portal-action-panel{background:radial-gradient(circle at 50% 35%,rgba(0,155,255,.14),transparent 38%),#0a0c12;border-color:rgba(37,151,255,.28)}.game-portal-action-panel .game-portal-logo-large{margin-bottom:16px}.game-portal-action-panel h2{margin:7px 0;color:#f4f5f8;font-size:28px}.game-portal-action-panel p{max-width:600px;color:#777b89;line-height:1.65;font-size:11px}.game-portal-primary{margin-top:12px;padding:12px 17px;font-size:10px}@media(max-width:1000px){.game-hub-grid,.game-portal-item-grid{grid-template-columns:repeat(2,1fr)}.game-portal-case-grid{grid-template-columns:repeat(2,1fr)}.game-portal-inventory-grid{grid-template-columns:repeat(3,1fr)}.game-portal-header{flex-direction:column}.game-portal-balance-card{text-align:left}}@media(max-width:650px){.game-portal-overlay{padding:78px 10px 18px}.game-portal-header h1{font-size:29px}.game-hub-layout,.game-portal-section{padding:14px}.game-hub-grid,.game-portal-item-grid,.game-portal-case-grid{grid-template-columns:1fr}.game-portal-inventory-grid{grid-template-columns:repeat(2,1fr)}.game-portal-gamebar,.game-portal-section-head{align-items:stretch;flex-direction:column}.game-portal-game-switcher{overflow:auto}.game-portal-balance-card{width:100%}.game-portal-item-art{height:180px}}
+
+/* =========================================================
+   GAME PORTAL — GAME INVENTORY ACTIONS / BRAINROT LOGO
+   ========================================================= */
+.brainrot-logo{overflow:hidden;padding:0}
+.brainrot-logo svg{width:100%;height:100%;display:block}
+.game-portal-inventory-art-wrap{position:relative}
+.game-portal-inventory-card{transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease}
+.game-portal-inventory-card:hover:not(.is-pending){transform:translateY(-3px);border-color:#4a3d5f;box-shadow:0 18px 42px rgba(0,0,0,.24)}
+.game-portal-theme-blue .game-portal-inventory-card:hover:not(.is-pending){border-color:rgba(51,177,255,.46);box-shadow:0 18px 42px rgba(0,123,255,.12)}
+.game-portal-inventory-actions{display:grid;grid-template-columns:1.15fr .85fr;gap:7px;margin-top:10px}
+.game-portal-inventory-actions button{min-height:34px;border-radius:9px;padding:8px 7px;font-size:9px;font-weight:900;cursor:pointer;transition:.18s ease}
+.game-portal-inventory-actions button:disabled{opacity:.45;cursor:not-allowed}
+.game-portal-inventory-sell{border:1px solid rgba(74,222,128,.24);background:rgba(74,222,128,.07);color:#79e7a0}
+.game-portal-inventory-sell:hover:not(:disabled){background:rgba(74,222,128,.13);border-color:rgba(74,222,128,.42);transform:translateY(-1px)}
+.game-portal-inventory-sell span{margin-left:4px;color:#a9f2bf}
+.game-portal-inventory-withdraw{border:1px solid #303343;background:#151722;color:#f4f5f8}
+.game-portal-inventory-withdraw:hover:not(:disabled){border-color:#5b536d;background:#1a1b25;transform:translateY(-1px)}
+.game-portal-theme-blue .game-portal-inventory-withdraw:hover:not(:disabled){border-color:rgba(67,184,255,.55);background:#0f1721}
+.game-portal-inventory-pending{display:flex;align-items:center;justify-content:center;gap:6px;min-height:34px;margin-top:10px;border:1px solid rgba(245,191,66,.18);border-radius:9px;background:rgba(245,191,66,.05);color:#eacb73;font-size:9px;font-weight:800}
+.game-portal-pending-dot{width:6px;height:6px;border-radius:50%;background:#e4b84c;box-shadow:0 0 10px rgba(228,184,76,.45)}
+.game-portal-action-modal-backdrop{position:fixed;inset:0;z-index:400;display:grid;place-items:center;padding:20px;background:rgba(0,0,0,.72);backdrop-filter:blur(12px)}
+.game-portal-action-modal{width:min(430px,94vw);position:relative;padding:26px;border:1px solid rgba(165,124,255,.22);border-radius:22px;background:radial-gradient(circle at 50% 0%,rgba(139,92,246,.13),transparent 40%),linear-gradient(160deg,#11131b,#090a0f);box-shadow:0 32px 100px rgba(0,0,0,.65)}
+.game-portal-overlay.game-portal-theme-blue .game-portal-action-modal{border-color:rgba(51,177,255,.27)}
+.game-portal-action-modal-close{position:absolute;top:12px;right:12px;width:32px;height:32px;border:1px solid #292c37;border-radius:9px;background:#11131b;color:#9da1ae;font-size:18px;line-height:1}
+.game-portal-action-modal-art{width:120px;height:120px;margin:14px auto 15px;border:1px solid #282b37;border-radius:16px;background:#090a0f;display:grid;place-items:center;overflow:hidden}
+.game-portal-action-modal-art img{width:88%;height:88%;object-fit:contain}
+.game-portal-action-modal-art span{font-size:46px;color:#756f84}
+.game-portal-action-modal h2{margin:0;text-align:center;font-size:23px;letter-spacing:-.8px}
+.game-portal-action-modal p{margin:10px auto 16px;max-width:360px;text-align:center;color:#777b89;font-size:10px;line-height:1.65}
+.game-portal-action-modal-value{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px 13px;border:1px solid #292c38;border-radius:11px;background:#0d0f15}
+.game-portal-action-modal-value span{color:#6d7180;font-size:8px;font-weight:900;letter-spacing:1.2px}
+.game-portal-action-modal-value strong{font-size:18px}
+.game-portal-action-modal-actions{display:grid;grid-template-columns:1fr 1.25fr;gap:9px;margin-top:14px}
+.game-portal-action-modal-actions button{min-height:44px;border-radius:11px;font-size:10px;font-weight:900}
+.game-portal-action-cancel{border:1px solid #2f3240;background:#12141c;color:#d2d5df}
+.game-portal-action-confirm{border:0;background:#a57cff;color:#fff;box-shadow:0 12px 30px rgba(139,92,246,.18)}
+.game-portal-theme-blue .game-portal-action-confirm{background:#139be8;box-shadow:0 12px 30px rgba(0,153,255,.18)}
+@media(max-width:650px){.game-portal-inventory-actions{grid-template-columns:1fr}.game-portal-action-modal{padding:22px}.game-portal-action-modal-art{width:105px;height:105px}}
+
+/* Multi-game withdrawal history */
+.game-portal-withdraw-head{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;margin-bottom:18px}
+.game-portal-withdraw-head h2{margin:6px 0 4px;font-size:26px;letter-spacing:-1px}
+.game-portal-withdraw-head p{margin:0;color:#777b89;font-size:10px;line-height:1.6;max-width:680px}
+.game-portal-history-refresh{border:1px solid #2d3040;background:#11131a;color:#b9bdc9;border-radius:9px;padding:10px 13px;font-size:10px;font-weight:800;cursor:pointer}
+.game-portal-history-refresh:hover:not(:disabled){border-color:#7160a7;color:#fff}
+.game-portal-history-refresh:disabled{opacity:.55;cursor:not-allowed}
+.game-portal-withdrawal-list{display:grid;gap:10px}
+.game-portal-withdrawal-row{display:grid;grid-template-columns:58px minmax(0,1fr) auto;gap:14px;align-items:center;padding:12px;border:1px solid #292c38;border-radius:14px;background:linear-gradient(160deg,#12141b,#0c0d12)}
+.game-portal-withdrawal-row.pending{border-color:rgba(233,182,55,.24)}
+.game-portal-withdrawal-row.completed{border-color:rgba(74,222,128,.17)}
+.game-portal-withdrawal-row.cancelled{opacity:.72}
+.game-portal-withdrawal-art{width:58px;height:58px;border:1px solid #262936;border-radius:11px;background:#090a0f;display:grid;place-items:center;overflow:hidden}
+.game-portal-withdrawal-art img{width:88%;height:88%;object-fit:contain}
+.game-portal-withdrawal-art span{font-size:23px;color:#777b89}
+.game-portal-withdrawal-info{min-width:0}
+.game-portal-withdrawal-title{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+.game-portal-withdrawal-title strong{font-size:13px;color:#eef0f5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.game-portal-withdrawal-status{padding:4px 7px;border-radius:6px;font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:.04em}
+.game-portal-withdrawal-status.pending{color:#f2c35a;background:rgba(233,182,55,.09);border:1px solid rgba(233,182,55,.2)}
+.game-portal-withdrawal-status.completed{color:#77e8a0;background:rgba(74,222,128,.08);border:1px solid rgba(74,222,128,.16)}
+.game-portal-withdrawal-status.cancelled{color:#ff91a3;background:rgba(255,80,108,.07);border:1px solid rgba(255,80,108,.15)}
+.game-portal-withdrawal-meta{display:flex;gap:10px;flex-wrap:wrap;margin-top:5px;color:#6f7380;font-size:9px}
+.game-portal-withdrawal-cancel{min-width:82px;border:1px solid rgba(255,92,117,.3);border-radius:9px;background:rgba(117,18,33,.18);color:#ff9cab;padding:10px 12px;font-size:9px;font-weight:900;cursor:pointer}
+.game-portal-withdrawal-cancel:hover:not(:disabled){background:rgba(140,23,42,.28);border-color:rgba(255,111,133,.52);color:#fff}
+.game-portal-withdrawal-cancel:disabled{opacity:.55;cursor:not-allowed}
+.game-portal-withdrawal-closed{font-size:9px;color:#686c79;padding:0 6px}
+
+/* Case details and roomier case browsing */
+.game-portal-case-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+.game-portal-case-card{min-width:0;box-shadow:0 18px 42px rgba(0,0,0,.18)}
+.game-portal-case-art{height:220px}
+.game-portal-case-card>button{margin-top:2px;padding:12px;font-size:10px}
+.game-portal-case-modal-backdrop{position:fixed;inset:0;z-index:320;display:grid;place-items:center;padding:28px;background:rgba(3,4,8,.78);backdrop-filter:blur(8px)}
+.game-portal-case-modal{width:min(860px,100%);max-height:min(86vh,860px);overflow:auto;position:relative;padding:24px;border:1px solid #303342;border-radius:22px;background:linear-gradient(165deg,#12141d,#0a0b10);box-shadow:0 30px 100px rgba(0,0,0,.65)}
+.game-portal-theme-blue .game-portal-case-modal{border-color:rgba(47,165,255,.28);box-shadow:0 30px 100px rgba(0,89,160,.22)}
+.game-portal-case-modal-close{position:absolute;top:12px;right:12px;width:36px;height:36px;border:1px solid #2b2e39;border-radius:10px;background:#11131a;color:#bfc3ce;font-size:20px;cursor:pointer}
+.game-portal-case-modal-loading{min-height:420px;display:grid;place-items:center;color:#8d92a0;font-size:12px;text-align:center}
+.game-portal-case-modal-loading.error{color:#ff929f}
+.game-portal-case-modal-art{height:250px;margin-bottom:16px;border:1px solid #282b37;border-radius:16px;background:radial-gradient(circle at 50% 42%,rgba(139,92,246,.14),transparent 60%),#090a10;display:grid;place-items:center;overflow:hidden}
+.game-portal-theme-blue .game-portal-case-modal-art{background:radial-gradient(circle at 50% 42%,rgba(0,157,255,.15),transparent 60%),#090a10}
+.game-portal-case-modal-art img{width:86%;height:86%;object-fit:contain}
+.game-portal-case-modal-art span{font-size:74px}
+.game-portal-case-modal h2{margin:5px 0 0;font-size:30px;letter-spacing:-1.1px}
+.game-portal-case-modal-price{margin-top:5px;color:#ba9bff;font-size:19px;font-weight:900}
+.game-portal-theme-blue .game-portal-case-modal-price{color:#5bc3ff}
+.game-portal-case-modal-copy{color:#777c8b;font-size:11px;line-height:1.65;margin:10px 0 18px}
+.game-portal-case-rewards{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:9px}
+.game-portal-case-reward{padding:8px;border:1px solid #272a35;border-radius:11px;background:#0d0f15;text-align:center;min-width:0}
+.game-portal-case-reward-art{height:90px;border-radius:8px;background:#090a0f;display:grid;place-items:center;overflow:hidden}
+.game-portal-case-reward-art img{width:90%;height:90%;object-fit:contain}
+.game-portal-case-reward-art span{font-size:28px;color:#6f7380}
+.game-portal-case-reward strong{display:block;margin-top:7px;font-size:9px;color:#e1e3e9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.game-portal-case-reward span{display:block;margin-top:3px;font-size:8px;color:#737886}
+.game-portal-case-reward b{display:block;margin-top:4px;font-size:9px;color:#ba9cff}
+.game-portal-theme-blue .game-portal-case-reward b{color:#59c2ff}
+.game-portal-case-modal-actions{display:grid;grid-template-columns:1fr 1.45fr;gap:10px;margin-top:18px}
+.game-portal-action-cancel,.game-portal-action-confirm{border-radius:10px;padding:12px;border:1px solid #2e3140;font-size:10px;font-weight:900;cursor:pointer}
+.game-portal-action-cancel{background:#11131a;color:#a7abb8}
+.game-portal-action-confirm{border-color:#9d74ff;background:#9d74ff;color:#fff;box-shadow:0 10px 28px rgba(139,92,246,.18)}
+.game-portal-theme-blue .game-portal-action-confirm{border-color:#149be9;background:#149be9;box-shadow:0 10px 28px rgba(0,153,255,.18)}
+.game-portal-action-confirm:disabled{opacity:.4;cursor:not-allowed;box-shadow:none}
+
+@media(max-width:900px){
+  .game-portal-case-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .game-portal-case-rewards{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media(max-width:650px){
+  .game-portal-withdraw-head{align-items:stretch;flex-direction:column}
+  .game-portal-case-grid{grid-template-columns:1fr}
+  .game-portal-case-art{height:210px}
+  .game-portal-case-modal-backdrop{padding:10px}
+  .game-portal-case-modal{padding:16px;border-radius:18px;max-height:92vh}
+  .game-portal-case-modal-art{height:200px}
+  .game-portal-case-rewards{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .game-portal-case-modal-actions{grid-template-columns:1fr}
+  .game-portal-withdrawal-row{grid-template-columns:48px minmax(0,1fr);gap:10px}
+  .game-portal-withdrawal-art{width:48px;height:48px}
+  .game-portal-withdrawal-cancel{grid-column:2;justify-self:start}
+}
+
+
+/* === Multi-game case + withdrawal refinement === */
+.game-portal-shell{width:min(1360px,100%)}
+.game-portal-section{padding:28px}
+.game-portal-case-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:22px}
+.game-portal-case-card{min-height:300px;border-radius:18px}
+.game-portal-case-art{height:210px}
+.game-portal-case-art img{width:90%;height:90%}
+.game-portal-case-copy{padding:14px 16px}
+.game-portal-case-copy h3{font-size:15px}
+.game-portal-case-copy strong{font-size:14px}
+.game-portal-case-card>button{width:calc(100% - 32px);margin:0 16px 16px;padding:12px;font-size:10px;cursor:pointer;transition:.18s ease}
+.game-portal-case-card>button:hover{border-color:#66518d;background:#1a1c28;transform:translateY(-1px)}
+.game-portal-theme-blue .game-portal-case-card>button:hover{border-color:rgba(67,184,255,.5);background:#101a25}
+.game-portal-case-rewards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.game-portal-case-reward{padding:10px;border:1px solid #292c38;border-radius:12px;background:#0e1017;text-align:center;min-width:0}
+.game-portal-case-reward-art{height:105px;border-radius:9px;border:1px solid #242733;background:#090a10;display:grid;place-items:center;overflow:hidden}
+.game-portal-case-reward-art img{width:86%;height:86%;object-fit:contain}
+.game-portal-case-reward strong{display:block;margin-top:7px;font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.game-portal-case-reward span{display:block;margin-top:3px;color:#777b89;font-size:8px}
+.game-portal-case-reward b{display:block;margin-top:4px;color:#b99cff;font-size:10px}
+.game-portal-theme-blue .game-portal-case-reward b{color:#54bfff}
+.game-portal-case-opening-backdrop{position:fixed;inset:0;z-index:340;display:grid;place-items:center;padding:20px;background:rgba(2,3,7,.82);backdrop-filter:blur(10px)}
+.game-portal-case-opening-modal{width:min(620px,100%);position:relative;padding:32px;border:1px solid #3a304d;border-radius:24px;background:radial-gradient(circle at 50% 18%,rgba(157,116,255,.16),transparent 38%),linear-gradient(165deg,#13151f,#090a0f);box-shadow:0 35px 120px rgba(0,0,0,.7);text-align:center}
+.game-portal-theme-blue .game-portal-case-opening-modal{border-color:rgba(67,184,255,.3);background:radial-gradient(circle at 50% 18%,rgba(0,157,255,.16),transparent 40%),linear-gradient(165deg,#101720,#090a0e)}
+.game-portal-opening-case-art{width:min(340px,82vw);height:260px;margin:16px auto 20px;border:1px solid #2d3040;border-radius:18px;background:radial-gradient(circle at 50% 42%,rgba(139,92,246,.18),transparent 60%),#080a0f;display:grid;place-items:center;overflow:hidden}
+.game-portal-theme-blue .game-portal-opening-case-art{background:radial-gradient(circle at 50% 42%,rgba(0,157,255,.18),transparent 60%),#080a0f}
+.game-portal-opening-case-art img{width:90%;height:90%;object-fit:contain}
+.game-portal-opening-case-art span{font-size:82px}
+.game-portal-opening-case-art.reward{box-shadow:0 0 65px rgba(157,116,255,.14)}
+.game-portal-case-opening-modal h2{margin:6px 0 4px;font-size:30px;letter-spacing:-1px}
+.game-portal-opening-copy{margin:7px auto 0;max-width:480px;color:#7b7f8d;font-size:11px;line-height:1.65}
+.game-portal-opening-spinner{width:44px;height:44px;margin:22px auto 4px;border:3px solid rgba(255,255,255,.1);border-top-color:#a57cff;border-radius:50%;animation:gamePortalSpin .75s linear infinite}
+.game-portal-theme-blue .game-portal-opening-spinner{border-top-color:#29adff}
+.game-portal-opening-spinner span{display:none}
+@keyframes gamePortalSpin{to{transform:rotate(360deg)}}
+.game-portal-reward-rarity{display:inline-block;margin-top:8px;padding:5px 9px;border-radius:7px;font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.06em;border:1px solid rgba(176,132,255,.24);color:#c5a7ff;background:rgba(176,132,255,.08)}
+.game-portal-reward-rarity.rare{color:#72c9ff;border-color:rgba(85,168,255,.28);background:rgba(85,168,255,.08)}
+.game-portal-reward-rarity.epic{color:#d9a1ff;border-color:rgba(192,128,255,.3);background:rgba(192,128,255,.09)}
+.game-portal-reward-rarity.legendary{color:#ffd966;border-color:rgba(255,217,102,.28);background:rgba(255,217,102,.08)}
+.game-portal-reward-rarity.secret{color:#ff8be5;border-color:rgba(255,95,228,.3);background:rgba(255,95,228,.08)}
+.game-portal-opening-value{display:block;margin-top:8px;font-size:22px;color:#fff}
+.game-portal-withdraw-head{display:flex;justify-content:space-between;gap:18px;align-items:end;margin-bottom:18px}
+.game-portal-withdraw-head h2{margin:5px 0 4px;font-size:25px;letter-spacing:-1px}
+.game-portal-withdraw-head p{margin:0;color:#777b89;font-size:10px;line-height:1.6}
+.game-portal-history-refresh{border:1px solid #303343;background:#11131b;color:#cfd2dc;border-radius:9px;padding:10px 13px;font-size:9px;font-weight:900;cursor:pointer}
+.game-portal-history-refresh:hover{border-color:#66518d;background:#171924}
+.game-portal-theme-blue .game-portal-history-refresh:hover{border-color:rgba(67,184,255,.48);background:#101a24}
+@media(max-width:1000px){.game-portal-case-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.game-portal-case-rewards{grid-template-columns:repeat(2,minmax(0,1fr))}.game-portal-withdraw-head{align-items:stretch;flex-direction:column}}
+@media(max-width:650px){.game-portal-case-grid{grid-template-columns:1fr}.game-portal-case-art{height:220px}.game-portal-case-rewards{grid-template-columns:repeat(2,minmax(0,1fr))}.game-portal-case-opening-modal{padding:22px}.game-portal-opening-case-art{height:210px}.game-portal-case-opening-modal h2{font-size:25px}.game-portal-withdraw-head{align-items:stretch}.game-portal-history-refresh{align-self:flex-start}}

@@ -4,9 +4,6 @@ import React, {
   useState,
   useRef,
 } from "react";
-import AdminMarketplacePanel from "./AdminMarketplacePanel.jsx";
-import "./admin-mines-details.css";
-import "./admin-marketplace.css";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:4000";
 
@@ -33,11 +30,6 @@ const rarityClass = (rarity) =>
 
 const money = (cents) =>
   `$${(Number(cents || 0) / 100).toFixed(2)}`;
-
-const GAME_OPTIONS = [
-  { slug: "steal-a-brainrot", name: "Steal a Brainrot", theme: "purple" },
-  { slug: "donutsmp", name: "DonutSMP", theme: "blue" },
-];
 
 const getPaymentDetails = (payment) => {
   const note = String(payment?.note || "").trim();
@@ -488,98 +480,6 @@ function RewardThumbnail({ item }) {
   );
 }
 
-function AcceptedDepositImagePicker({ value, onChange, disabled }) {
-  const inputRef = useRef(null);
-  const [fileName, setFileName] = useState("");
-  const [preview, setPreview] = useState(value || "");
-  const [dragging, setDragging] = useState(false);
-  const [uploading, setUploading] = useState(false);
-
-  useEffect(() => {
-    setPreview(value || "");
-  }, [value]);
-
-  const acceptFile = async (file) => {
-    if (!file || disabled || uploading) return;
-    if (!IMAGE_TYPES.includes(file.type)) {
-      return;
-    }
-    if (file.size > IMAGE_MAX_BYTES) return;
-
-    setUploading(true);
-    try {
-      const imageUrl = await uploadRewardImage(file);
-      setFileName(file.name);
-      setPreview(imageUrl);
-      onChange(imageUrl);
-    } catch (error) {
-      console.error("Accepted deposit image upload failed:", error);
-      // The parent form will surface its normal error state through validation/save.
-    } finally {
-      setUploading(false);
-      if (inputRef.current) inputRef.current.value = "";
-    }
-  };
-
-  return (
-    <button
-      type="button"
-      className={`marketplace-image-picker${dragging ? " is-dragging" : ""}${preview ? " has-image" : ""}`}
-      disabled={disabled || uploading}
-      onDragEnter={(event) => {
-        event.preventDefault();
-        if (!disabled && !uploading) setDragging(true);
-      }}
-      onDragOver={(event) => event.preventDefault()}
-      onDragLeave={(event) => {
-        event.preventDefault();
-        setDragging(false);
-      }}
-      onDrop={(event) => {
-        event.preventDefault();
-        setDragging(false);
-        void acceptFile(event.dataTransfer.files?.[0]);
-      }}
-      onClick={() => inputRef.current?.click()}
-    >
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/png,image/jpeg,image/webp"
-        hidden
-        disabled={disabled || uploading}
-        onChange={(event) => void acceptFile(event.target.files?.[0])}
-      />
-
-      {uploading ? (
-        <>
-          <span className="marketplace-upload-icon">↑</span>
-          <span className="marketplace-image-copy">
-            <strong>Uploading image...</strong>
-            <small>Please wait</small>
-          </span>
-        </>
-      ) : preview ? (
-        <>
-          <img src={preview} alt="Preview" className="marketplace-image-preview" />
-          <span className="marketplace-image-copy">
-            <strong>{fileName || "Image selected"}</strong>
-            <small>Click or drag to replace the image.</small>
-          </span>
-        </>
-      ) : (
-        <>
-          <span className="marketplace-upload-icon">↑</span>
-          <span className="marketplace-image-copy">
-            <strong>Upload item image</strong>
-            <small>PNG, JPG or WEBP · Max 5 MB</small>
-          </span>
-        </>
-      )}
-    </button>
-  );
-}
-
 function Admin() {
   const [cases, setCases] = useState([]);
   const [items, setItems] = useState([]);
@@ -618,8 +518,6 @@ function Admin() {
   const [adminOpenings, setAdminOpenings] = useState([]);
   const [adminTransactions, setAdminTransactions] = useState([]);
   const [adminActivityTab, setAdminActivityTab] = useState("openings");
-  const [adminMinesDetail, setAdminMinesDetail] = useState(null);
-  const [adminMinesDetailLoading, setAdminMinesDetailLoading] = useState(false);
   const [adminActivitySearch, setAdminActivitySearch] = useState("");
   const [adminAccess, setAdminAccess] = useState(null);
   const [adminAccessLoading, setAdminAccessLoading] = useState(true);
@@ -630,26 +528,6 @@ function Admin() {
   const [brainrotDepositStatus, setBrainrotDepositStatus] = useState("pending");
   const [brainrotDepositSearch, setBrainrotDepositSearch] = useState("");
   const [brainrotDepositDrafts, setBrainrotDepositDrafts] = useState({});
-
-  // Accepted Brainrot deposit catalog
-  const [acceptedBrainrots, setAcceptedBrainrots] = useState([]);
-  const [acceptedBrainrotsLoading, setAcceptedBrainrotsLoading] = useState(false);
-  const [acceptedBrainrotSearch, setAcceptedBrainrotSearch] = useState("");
-  const [acceptedBrainrotSaving, setAcceptedBrainrotSaving] = useState(false);
-  const [acceptedBrainrotForm, setAcceptedBrainrotForm] = useState({
-    name: "",
-    rarity: "Common",
-    value: "",
-    imageUrl: "",
-  });
-  const [editingAcceptedBrainrot, setEditingAcceptedBrainrot] = useState(null);
-  const [editingAcceptedBrainrotForm, setEditingAcceptedBrainrotForm] = useState({
-    name: "",
-    rarity: "Common",
-    value: "",
-    imageUrl: "",
-  });
-
   const [adminPaymentsLoading, setAdminPaymentsLoading] = useState(false);
   const [adminPaymentStatus, setAdminPaymentStatus] = useState("pending");
   const [adminPaymentSearch, setAdminPaymentSearch] = useState("");
@@ -703,7 +581,6 @@ const [creatorCommissionUpdating, setCreatorCommissionUpdating] = useState(false
   const [newCase, setNewCase] = useState({
     name: "",
     price: "",
-    gameSlug: "steal-a-brainrot",
   });
 
   const [newItem, setNewItem] = useState({
@@ -711,7 +588,6 @@ const [creatorCommissionUpdating, setCreatorCommissionUpdating] = useState(false
     rarity: "Common",
     value: "",
     imageUrl: "",
-    gameSlug: "steal-a-brainrot",
   });
 
   const [rewardForm, setRewardForm] = useState({
@@ -723,7 +599,6 @@ const [editingCase, setEditingCase] = useState({
   name: "",
   price: "",
   imageUrl: "",
-  gameSlug: "steal-a-brainrot",
 });
 
   const [caseSearch, setCaseSearch] = useState("");
@@ -953,7 +828,6 @@ setEditingCase({
     Number(data.case.price_cents || 0) / 100
   ).toFixed(2),
   imageUrl: data.case.image_url || "",
-  gameSlug: data.case.game_slug || "steal-a-brainrot",
 });
     } catch (err) {
       console.error(err);
@@ -1477,33 +1351,6 @@ setEditingCase({
     } catch (err) {
       console.error(err);
       setError(err.message);
-    }
-  };
-
-  const loadAdminMinesDetail = async (transaction) => {
-    if (!transaction || String(transaction.type || "") !== "mines_bet") return;
-
-    setAdminMinesDetailLoading(true);
-    setAdminMinesDetail(null);
-
-    try {
-      const response = await apiFetch(
-        `${API}/api/admin/mines/transaction/${transaction.id}`
-      );
-      const data = await response.json().catch(() => ({}));
-
-      if (!response.ok) {
-        throw new Error(
-          data.error || data.message || "Failed to load Mines game details"
-        );
-      }
-
-      setAdminMinesDetail(data.game || null);
-    } catch (err) {
-      console.error("Admin Mines detail load failed:", err);
-      setError(err.message);
-    } finally {
-      setAdminMinesDetailLoading(false);
     }
   };
 
@@ -2207,181 +2054,6 @@ setEditingCase({
     }
   };
 
-  const loadAcceptedBrainrots = async (search = acceptedBrainrotSearch) => {
-    setAcceptedBrainrotsLoading(true);
-    try {
-      const params = new URLSearchParams();
-      if (search.trim()) params.set("search", search.trim());
-      const query = params.toString() ? `?${params.toString()}` : "";
-      const response = await apiFetch(`${API}/api/admin/brainrot-deposit-items${query}`, {
-        cache: "no-store",
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to load accepted Brainrots");
-      }
-      setAcceptedBrainrots(data.items || []);
-    } catch (err) {
-      console.error("Accepted Brainrot catalog load failed:", err);
-      setError(err.message || "Failed to load accepted Brainrots");
-    } finally {
-      setAcceptedBrainrotsLoading(false);
-    }
-  };
-
-  const createAcceptedBrainrot = async (event) => {
-    event.preventDefault();
-
-    const name = acceptedBrainrotForm.name.trim();
-    const value = Number(acceptedBrainrotForm.value);
-
-    if (!name) {
-      setError("Enter a Brainrot name.");
-      return;
-    }
-    if (!RARITIES.includes(acceptedBrainrotForm.rarity)) {
-      setError("Choose a valid rarity.");
-      return;
-    }
-    if (!Number.isFinite(value) || value <= 0) {
-      setError("Enter a valid deposit value.");
-      return;
-    }
-
-    try {
-      setAcceptedBrainrotSaving(true);
-      setError("");
-      setSuccess("");
-
-      const response = await apiFetch(`${API}/api/admin/brainrot-deposit-items`, {
-        method: "POST",
-        body: JSON.stringify({
-          gameSlug: "steal-a-brainrot",
-          name,
-          rarity: acceptedBrainrotForm.rarity,
-          valueCents: Math.round(value * 100),
-          imageUrl: acceptedBrainrotForm.imageUrl.trim() || null,
-          active: true,
-        }),
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.message || data.error || "Failed to add accepted Brainrot");
-      }
-
-      setAcceptedBrainrotForm({ name: "", rarity: "Common", value: "", imageUrl: "" });
-      await loadAcceptedBrainrots();
-      setSuccess(`${name} was added to Accepted Deposits.`);
-    } catch (err) {
-      console.error("Accepted Brainrot creation failed:", err);
-      setError(err.message || "Failed to add accepted Brainrot");
-    } finally {
-      setAcceptedBrainrotSaving(false);
-    }
-  };
-
-  const openAcceptedBrainrotEdit = (item) => {
-    setError("");
-    setSuccess("");
-    setEditingAcceptedBrainrot(item);
-    setEditingAcceptedBrainrotForm({
-      name: String(item.name || ""),
-      rarity: String(item.rarity || "Common"),
-      value: (Number(item.value_cents || 0) / 100).toFixed(2),
-      imageUrl: String(item.image_url || ""),
-    });
-  };
-
-  const closeAcceptedBrainrotEdit = () => {
-    if (acceptedBrainrotSaving) return;
-    setEditingAcceptedBrainrot(null);
-    setEditingAcceptedBrainrotForm({ name: "", rarity: "Common", value: "", imageUrl: "" });
-  };
-
-  const saveAcceptedBrainrotEdit = async () => {
-    if (!editingAcceptedBrainrot) return;
-
-    const name = editingAcceptedBrainrotForm.name.trim();
-    const value = Number(editingAcceptedBrainrotForm.value);
-
-    if (!name) {
-      setError("Enter a Brainrot name.");
-      return;
-    }
-    if (!RARITIES.includes(editingAcceptedBrainrotForm.rarity)) {
-      setError("Choose a valid rarity.");
-      return;
-    }
-    if (!Number.isFinite(value) || value <= 0) {
-      setError("Enter a valid deposit value.");
-      return;
-    }
-
-    try {
-      setAcceptedBrainrotSaving(true);
-      setError("");
-      setSuccess("");
-
-      const response = await apiFetch(`${API}/api/admin/brainrot-deposit-items/${editingAcceptedBrainrot.id}`, {
-        method: "PATCH",
-        body: JSON.stringify({
-          name,
-          rarity: editingAcceptedBrainrotForm.rarity,
-          valueCents: Math.round(value * 100),
-          imageUrl: editingAcceptedBrainrotForm.imageUrl.trim() || null,
-          active: editingAcceptedBrainrot.active !== false,
-        }),
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.message || data.error || "Failed to update accepted Brainrot");
-      }
-
-      closeAcceptedBrainrotEdit();
-      await loadAcceptedBrainrots();
-      setSuccess(`${name} was updated successfully.`);
-    } catch (err) {
-      console.error("Accepted Brainrot update failed:", err);
-      setError(err.message || "Failed to update accepted Brainrot");
-    } finally {
-      setAcceptedBrainrotSaving(false);
-    }
-  };
-
-  const removeAcceptedBrainrot = async (item) => {
-    if (!item?.id) return;
-    if (!window.confirm(`Remove ${item.name} from Accepted Deposits?\n\nUsers will no longer see it as an accepted deposit.`)) return;
-
-    try {
-      setAcceptedBrainrotSaving(true);
-      setError("");
-      setSuccess("");
-
-      const response = await apiFetch(`${API}/api/admin/brainrot-deposit-items/${item.id}`, {
-        method: "DELETE",
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.message || data.error || "Failed to remove accepted Brainrot");
-      }
-
-      await loadAcceptedBrainrots();
-      setSuccess(`${item.name} was removed from Accepted Deposits.`);
-    } catch (err) {
-      console.error("Accepted Brainrot removal failed:", err);
-      setError(err.message || "Failed to remove accepted Brainrot");
-    } finally {
-      setAcceptedBrainrotSaving(false);
-    }
-  };
-
-  const loadBrainrotDepositPage = async () => {
-    await Promise.all([
-      loadAcceptedBrainrots(),
-      loadAdminBrainrotDeposits(),
-    ]);
-  };
-
   const loadAdminBrainrotDeposits = async (status = brainrotDepositStatus, search = brainrotDepositSearch) => {
     setBrainrotDepositsLoading(true);
     try {
@@ -2798,7 +2470,6 @@ setSuccess(
           body: JSON.stringify({
             name: newCase.name.trim(),
             priceCents: Math.round(price * 100),
-            gameSlug: newCase.gameSlug,
           }),
         }
       );
@@ -2814,7 +2485,6 @@ setSuccess(
       setNewCase({
         name: "",
         price: "",
-        gameSlug: "steal-a-brainrot",
       });
 
       setShowCreateCase(false);
@@ -2868,7 +2538,6 @@ body: JSON.stringify({
   name: editingCase.name.trim(),
   priceCents: Math.round(price * 100),
   imageUrl: editingCase.imageUrl.trim() || null,
-  gameSlug: editingCase.gameSlug,
 }),
         }
       );
@@ -3199,7 +2868,6 @@ body: JSON.stringify({
               value * 100
             ),
             imageUrl: newItem.imageUrl.trim() || null,
-            gameSlug: newItem.gameSlug,
           }),
         }
       );
@@ -3218,7 +2886,6 @@ body: JSON.stringify({
         rarity: "Common",
         value: "",
         imageUrl: "",
-        gameSlug: "steal-a-brainrot",
       });
 
       setShowCreateItem(false);
@@ -3430,7 +3097,6 @@ body: JSON.stringify({
         body: JSON.stringify({
           name: `${selectedCase.name} Copy`,
           priceCents: Number(selectedCase.price_cents),
-          gameSlug: selectedCase.game_slug || "steal-a-brainrot",
         }),
       });
 
@@ -3478,14 +3144,11 @@ body: JSON.stringify({
       )
     );
 
-    const selectedGame = selectedCase?.game_slug || "steal-a-brainrot";
-
     return items.filter(
       (item) =>
-        !existingIds.has(Number(item.id)) &&
-        String(item.game_slug || "steal-a-brainrot") === selectedGame
+        !existingIds.has(Number(item.id))
     );
-  }, [items, caseItems, selectedCase?.game_slug]);
+  }, [items, caseItems]);
 
   if (adminAccessLoading || loading) {
     return (
@@ -3602,9 +3265,6 @@ body: JSON.stringify({
 <button type="button" className={adminView === "cases" ? "admin-sidebar-item active" : "admin-sidebar-item"} onClick={() => setAdminView("cases")}>
               <span className="admin-sidebar-icon">▣</span><span>Cases</span>
             </button>
-            <button type="button" className={adminView === "marketplace" ? "admin-sidebar-item active" : "admin-sidebar-item"} onClick={() => setAdminView("marketplace")}>
-              <span className="admin-sidebar-icon">◈</span><span>Marketplace</span>
-            </button>
            <button
   type="button"
   className="admin-sidebar-item"
@@ -3622,7 +3282,7 @@ body: JSON.stringify({
             <button type="button" className={adminView === "payments" ? "admin-sidebar-item active" : "admin-sidebar-item"} onClick={() => { setAdminView("payments"); loadAdminPayments(); }}>
               <span className="admin-sidebar-icon">$</span><span>Payments</span>
             </button>
-            <button type="button" className={adminView === "brainrot-deposits" ? "admin-sidebar-item active" : "admin-sidebar-item"} onClick={() => { setAdminView("brainrot-deposits"); loadBrainrotDepositPage(); }}>
+            <button type="button" className={adminView === "brainrot-deposits" ? "admin-sidebar-item active" : "admin-sidebar-item"} onClick={() => { setAdminView("brainrot-deposits"); loadAdminBrainrotDeposits(); }}>
               <span className="admin-sidebar-icon">◇</span><span>Brainrot Deposits</span>
             </button>
             <button type="button" className={adminView === "item-withdrawals" ? "admin-sidebar-item active" : "admin-sidebar-item"} onClick={() => { setAdminView("item-withdrawals"); loadAdminItemWithdrawals(); }}>
@@ -3874,7 +3534,7 @@ body: JSON.stringify({
               <span className="admin-command-arrow">→</span>
             </button>
 
-            <button type="button" className="admin-command-card brainrot-deposits" onClick={() => { setAdminView("brainrot-deposits"); loadBrainrotDepositPage(); }}>
+            <button type="button" className="admin-command-card brainrot-deposits" onClick={() => { setAdminView("brainrot-deposits"); loadAdminBrainrotDeposits(); }}>
               <span className="admin-command-icon">◇</span><span className="admin-command-copy"><strong>Brainrot Deposits</strong><small>{brainrotDeposits.filter((deposit) => String(deposit.status || "").toLowerCase() === "pending").length} pending submissions</small></span><span className="admin-command-arrow">→</span>
             </button>
 
@@ -4048,7 +3708,6 @@ body: JSON.stringify({
             </div>
             <div className="admin-management-tabs">
               <button className={adminView === "cases" ? "active" : ""} onClick={() => setAdminView("cases")}>Cases</button>
-              <button className={adminView === "marketplace" ? "active" : ""} onClick={() => setAdminView("marketplace")}>Marketplace</button>
               <button className={adminView === "users" ? "active" : ""} onClick={() => { setAdminView("users"); loadAdminUsers(); }}>Users</button>
               <button className={adminView === "activity" ? "active" : ""} onClick={() => { setAdminView("activity"); loadAdminActivity(); }}>Activity</button>
             </div>
@@ -4330,9 +3989,9 @@ body: JSON.stringify({
                   ) : (
                     <div className="admin-activity-table-wrap">
                       <table className="admin-activity-table">
-                        <thead><tr><th>User</th><th>Type</th><th>Amount</th><th>Reference</th><th>Date</th><th>Actions</th></tr></thead>
+                        <thead><tr><th>User</th><th>Type</th><th>Amount</th><th>Reference</th><th>Date</th></tr></thead>
                         <tbody>
-                          {adminTransactions.length === 0 ? <tr><td colSpan="6" className="admin-table-empty">No transactions found.</td></tr> : adminTransactions.map((tx) => {
+                          {adminTransactions.length === 0 ? <tr><td colSpan="5" className="admin-table-empty">No transactions found.</td></tr> : adminTransactions.map((tx) => {
                             const amount = Number(tx.amount_cents || 0);
                             const label = String(tx.type || "transaction").replaceAll("_", " ");
                             return (
@@ -4342,20 +4001,6 @@ body: JSON.stringify({
                                 <td className={amount >= 0 ? "admin-table-positive" : "admin-table-negative"}>{amount >= 0 ? "+" : "-"}{money(Math.abs(amount))}</td>
                                 <td className="admin-table-muted">{tx.reference || "—"}</td>
                                 <td className="admin-table-muted">{new Date(tx.created_at).toLocaleString()}</td>
-                                <td>
-                                  {String(tx.type || "") === "mines_bet" ? (
-                                    <button
-                                      type="button"
-                                      className="admin-secondary-button admin-mines-view-button"
-                                      onClick={() => loadAdminMinesDetail(tx)}
-                                      disabled={adminMinesDetailLoading}
-                                    >
-                                      View game
-                                    </button>
-                                  ) : (
-                                    <span className="admin-table-muted">—</span>
-                                  )}
-                                </td>
                               </tr>
                             );
                           })}
@@ -5815,212 +5460,18 @@ body: JSON.stringify({
         )}
 
         {adminView === "brainrot-deposits" && (
-          <>
-            <section className="admin-management-card admin-marketplace-panel">
-              <div className="admin-marketplace-header">
-                <div>
-                  <div className="admin-eyebrow">ACCEPTED DEPOSITS</div>
-                  <h2>Accepted Deposits</h2>
-                  <p>Manage the Brainrots you accept for deposits and set the exact CASEX value each one is worth.</p>
-                </div>
-                <div className="admin-marketplace-game-switcher" aria-label="Accepted deposit game">
-                  <button type="button" className="active">Steal a Brainrot</button>
-                </div>
-              </div>
-
-              <form className="admin-marketplace-create-card" onSubmit={createAcceptedBrainrot}>
-                <div className="admin-marketplace-section-title">
-                  <div>
-                    <span className="admin-marketplace-kicker">NEW ACCEPTED DEPOSIT</span>
-                    <h3>Add Steal a Brainrot item</h3>
-                  </div>
-                  <span className="admin-marketplace-game-pill">Steal a Brainrot</span>
-                </div>
-
-                <div className="admin-marketplace-create-layout">
-                  <AcceptedDepositImagePicker
-                    value={acceptedBrainrotForm.imageUrl}
-                    onChange={(imageUrl) => setAcceptedBrainrotForm((current) => ({ ...current, imageUrl: imageUrl || "" }))}
-                    disabled={acceptedBrainrotSaving}
-                  />
-
-                  <div className="admin-marketplace-form-fields">
-                    <label>
-                      <span>Item name</span>
-                      <input
-                        value={acceptedBrainrotForm.name}
-                        onChange={(event) => setAcceptedBrainrotForm((current) => ({ ...current, name: event.target.value }))}
-                        placeholder="e.g. Rainbow Garama"
-                        maxLength={120}
-                      />
-                    </label>
-
-                    <label>
-                      <span>Rarity</span>
-                      <select
-                        value={acceptedBrainrotForm.rarity}
-                        onChange={(event) => setAcceptedBrainrotForm((current) => ({ ...current, rarity: event.target.value }))}
-                      >
-                        {RARITIES.map((value) => <option key={value}>{value}</option>)}
-                      </select>
-                    </label>
-
-                    <label>
-                      <span>Deposit value</span>
-                      <div className="admin-marketplace-money-input">
-                        <b>$</b>
-                        <input
-                          type="number"
-                          min="0.01"
-                          step="0.01"
-                          value={acceptedBrainrotForm.value}
-                          onChange={(event) => setAcceptedBrainrotForm((current) => ({ ...current, value: event.target.value }))}
-                          placeholder="15.00"
-                        />
-                      </div>
-                    </label>
-
-                    <button type="submit" className="admin-primary-button admin-marketplace-create-button" disabled={acceptedBrainrotSaving}>
-                      {acceptedBrainrotSaving ? "Adding..." : "Add Accepted Brainrot"}
-                    </button>
-                  </div>
-                </div>
-              </form>
-
-              {(error || success) && (
-                <div className={`admin-marketplace-alert ${error ? "error" : "success"}`}>
-                  <strong>{error ? "Error" : "Saved"}</strong>
-                  <span>{error || success}</span>
-                  <button type="button" onClick={() => { setError(""); setSuccess(""); }}>×</button>
-                </div>
-              )}
-
-              <div className="admin-marketplace-list-head">
-                <div>
-                  <span className="admin-marketplace-kicker">ACCEPTED BRAINROTS</span>
-                  <h3>Deposit catalog</h3>
-                  <p>{acceptedBrainrots.length} accepted Brainrot{acceptedBrainrots.length === 1 ? "" : "s"}</p>
-                </div>
-                <button type="button" className="admin-secondary-button" onClick={() => void loadAcceptedBrainrots()} disabled={acceptedBrainrotsLoading || acceptedBrainrotSaving}>
-                  {acceptedBrainrotsLoading ? "Loading..." : "Refresh"}
-                </button>
-              </div>
-
-              <div className="admin-management-toolbar">
-                <div className="admin-search-wrap">
-                  <span>⌕</span>
-                  <input
-                    value={acceptedBrainrotSearch}
-                    onChange={(event) => setAcceptedBrainrotSearch(event.target.value)}
-                    onKeyDown={(event) => { if (event.key === "Enter") loadAcceptedBrainrots(); }}
-                    placeholder="Search accepted Brainrots..."
-                  />
-                  {acceptedBrainrotSearch && <button type="button" onClick={() => { setAcceptedBrainrotSearch(""); loadAcceptedBrainrots(""); }}>×</button>}
-                </div>
-              </div>
-
-              {acceptedBrainrotsLoading ? (
-                <div className="admin-marketplace-empty">Loading accepted deposits...</div>
-              ) : acceptedBrainrots.length === 0 ? (
-                <div className="admin-marketplace-empty">
-                  <strong>No accepted Brainrots yet.</strong>
-                  <span>Add a Brainrot above and it will immediately become available on the user Deposit page.</span>
-                </div>
-              ) : (
-                <div className="admin-marketplace-list-grid">
-                  {acceptedBrainrots.map((item) => (
-                    <article className={`admin-marketplace-card${item.active === false ? " is-paused" : ""}`} key={item.id}>
-                      <div className="admin-marketplace-card-image">
-                        {item.image_url ? <img src={item.image_url} alt="" draggable="false" /> : <span>◇</span>}
-                        <span className={`admin-marketplace-status ${item.active === false ? "paused" : "live"}`}>
-                          {item.active === false ? "PAUSED" : "ACCEPTED"}
-                        </span>
-                      </div>
-
-                      <div className="admin-marketplace-card-body">
-                        <div className="admin-marketplace-card-copy">
-                          <h4>{item.name}</h4>
-                          <span>{item.rarity}</span>
-                        </div>
-
-                        <div className="admin-marketplace-card-stats">
-                          <div><small>DEPOSIT VALUE</small><strong>{money(item.value_cents)}</strong></div>
-                        </div>
-
-                        <div className="admin-marketplace-card-actions">
-                          <button type="button" className="admin-secondary-button" onClick={() => openAcceptedBrainrotEdit(item)} disabled={acceptedBrainrotSaving}>Edit</button>
-                          <button type="button" className="admin-marketplace-delete-button" onClick={() => void removeAcceptedBrainrot(item)} disabled={acceptedBrainrotSaving}>Delete</button>
-                        </div>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              )}
-
-              {editingAcceptedBrainrot && (
-                <div className="admin-marketplace-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) closeAcceptedBrainrotEdit(); }}>
-                  <div className="admin-marketplace-modal" role="dialog" aria-modal="true" aria-labelledby="accepted-brainrot-edit-title">
-                    <div className="admin-marketplace-modal-head">
-                      <div>
-                        <span className="admin-marketplace-kicker">EDIT ACCEPTED DEPOSIT</span>
-                        <h3 id="accepted-brainrot-edit-title">{editingAcceptedBrainrot.name}</h3>
-                        <p>Update the Brainrot's accepted deposit value without creating a new entry.</p>
-                      </div>
-                      <button type="button" className="admin-marketplace-close" onClick={closeAcceptedBrainrotEdit} disabled={acceptedBrainrotSaving}>×</button>
-                    </div>
-
-                    <div className="admin-marketplace-edit-layout">
-                      <AcceptedDepositImagePicker
-                        value={editingAcceptedBrainrotForm.imageUrl}
-                        onChange={(imageUrl) => setEditingAcceptedBrainrotForm((current) => ({ ...current, imageUrl: imageUrl || "" }))}
-                        disabled={acceptedBrainrotSaving}
-                      />
-
-                      <div className="admin-marketplace-form-fields">
-                        <label>
-                          <span>Item name</span>
-                          <input value={editingAcceptedBrainrotForm.name} onChange={(event) => setEditingAcceptedBrainrotForm((current) => ({ ...current, name: event.target.value }))} maxLength={120} />
-                        </label>
-                        <label>
-                          <span>Rarity</span>
-                          <select value={editingAcceptedBrainrotForm.rarity} onChange={(event) => setEditingAcceptedBrainrotForm((current) => ({ ...current, rarity: event.target.value }))}>
-                            {RARITIES.map((value) => <option key={value}>{value}</option>)}
-                          </select>
-                        </label>
-                        <label>
-                          <span>Deposit value</span>
-                          <div className="admin-marketplace-money-input">
-                            <b>$</b>
-                            <input type="number" min="0.01" step="0.01" value={editingAcceptedBrainrotForm.value} onChange={(event) => setEditingAcceptedBrainrotForm((current) => ({ ...current, value: event.target.value }))} />
-                          </div>
-                        </label>
-                      </div>
-                    </div>
-
-                    <div className="admin-marketplace-modal-actions">
-                      <button type="button" className="admin-secondary-button" onClick={closeAcceptedBrainrotEdit} disabled={acceptedBrainrotSaving}>Cancel</button>
-                      <button type="button" className="admin-primary-button" onClick={() => void saveAcceptedBrainrotEdit()} disabled={acceptedBrainrotSaving}>
-                        {acceptedBrainrotSaving ? "Saving..." : "Save Changes"}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </section>
-
-            <section className="admin-management-card admin-brainrot-deposits-section">
-              <div className="admin-management-head">
-                <div><div className="admin-eyebrow">MANUAL DEPOSITS</div><h2>Brainrot Deposits</h2><p>Verify what you received in-game, set the approved value, then credit the user's CASEX wallet.</p></div>
-                <div className="admin-payment-status-tabs">{[["pending","Pending"],["approved","Approved"],["rejected","Rejected"],["all","All"]].map(([value,label]) => <button key={value} className={brainrotDepositStatus === value ? "active" : ""} onClick={() => { setBrainrotDepositStatus(value); loadAdminBrainrotDeposits(value, brainrotDepositSearch); }}>{label}</button>)}</div>
-              </div>
-              <div className="admin-management-body">
-                <div className="admin-management-toolbar"><div className="admin-search-wrap"><span>⌕</span><input value={brainrotDepositSearch} onChange={(e) => setBrainrotDepositSearch(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") loadAdminBrainrotDeposits(); }} placeholder="Search user or deposit code..." /></div><button className="admin-secondary-button" onClick={() => loadAdminBrainrotDeposits()} disabled={brainrotDepositsLoading}>{brainrotDepositsLoading ? "Loading..." : "↻ Refresh"}</button></div>
-                <div className="admin-activity-table-wrap"><table className="admin-activity-table admin-brainrot-deposits-table"><thead><tr><th>ID</th><th>User</th><th>Deposit Code</th><th>Brainrots Received</th><th>Approved Value</th><th>Status</th><th>Staff Note</th><th>Action</th></tr></thead><tbody>
-                  {brainrotDeposits.length === 0 ? <tr><td colSpan="8" className="admin-table-empty">No Brainrot deposits found.</td></tr> : brainrotDeposits.map((deposit) => { const id=String(deposit.id); const draft=brainrotDepositDrafts[id] || {}; return <tr key={deposit.id}><td>#{deposit.id}</td><td><strong>{deposit.username}</strong><small>#{deposit.user_id}</small></td><td><code className="admin-brainrot-code">{deposit.deposit_code}</code></td><td>{deposit.status === "pending" ? <textarea className="admin-brainrot-textarea" value={draft.itemsDescription || ""} onChange={(e) => updateBrainrotDepositDraft(deposit.id,"itemsDescription",e.target.value)} placeholder="e.g. Rainbow Garama, Garama..."/> : <span>{deposit.items_description || "—"}</span>}</td><td>{deposit.status === "pending" ? <div className="admin-brainrot-amount-wrap"><span>$</span><input type="number" min="0" step="0.01" value={Number(draft.amountCents || 0)/100} onChange={(e) => updateBrainrotDepositDraft(deposit.id,"amountCents",Math.round(Number(e.target.value || 0)*100))}/></div> : <span className="admin-table-money">{money(deposit.amount_cents)}</span>}</td><td><span className={`admin-payment-status ${deposit.status}`}>{deposit.status}</span></td><td>{deposit.status === "pending" ? <textarea className="admin-brainrot-textarea" value={draft.staffNote || ""} onChange={(e) => updateBrainrotDepositDraft(deposit.id,"staffNote",e.target.value)} placeholder="Optional internal note..."/> : <span className="admin-table-muted">{deposit.staff_note || "—"}</span>}</td><td>{deposit.status === "pending" ? <div className="admin-payment-actions"><button className="admin-payment-approve" onClick={() => reviewBrainrotDeposit(deposit,"approve")} disabled={saving}>✓ Credit</button><button className="admin-payment-reject" onClick={() => reviewBrainrotDeposit(deposit,"reject")} disabled={saving}>× Reject</button></div> : <span className="admin-table-muted">{deposit.reviewer_username || "Reviewed"}</span>}</td></tr>; })}
-                </tbody></table></div>
-              </div>
-            </section>
-          </>
+          <section className="admin-management-card admin-brainrot-deposits-section">
+            <div className="admin-management-head">
+              <div><div className="admin-eyebrow">MANUAL DEPOSITS</div><h2>Brainrot Deposits</h2><p>Verify what you received in-game, set the approved value, then credit the user's CASEX wallet.</p></div>
+              <div className="admin-payment-status-tabs">{[["pending","Pending"],["approved","Approved"],["rejected","Rejected"],["all","All"]].map(([value,label]) => <button key={value} className={brainrotDepositStatus === value ? "active" : ""} onClick={() => { setBrainrotDepositStatus(value); loadAdminBrainrotDeposits(value, brainrotDepositSearch); }}>{label}</button>)}</div>
+            </div>
+            <div className="admin-management-body">
+              <div className="admin-management-toolbar"><div className="admin-search-wrap"><span>⌕</span><input value={brainrotDepositSearch} onChange={(e) => setBrainrotDepositSearch(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") loadAdminBrainrotDeposits(); }} placeholder="Search user or deposit code..." /></div><button className="admin-secondary-button" onClick={() => loadAdminBrainrotDeposits()} disabled={brainrotDepositsLoading}>{brainrotDepositsLoading ? "Loading..." : "↻ Refresh"}</button></div>
+              <div className="admin-activity-table-wrap"><table className="admin-activity-table admin-brainrot-deposits-table"><thead><tr><th>ID</th><th>User</th><th>Deposit Code</th><th>Brainrots Received</th><th>Approved Value</th><th>Status</th><th>Staff Note</th><th>Action</th></tr></thead><tbody>
+                {brainrotDeposits.length === 0 ? <tr><td colSpan="8" className="admin-table-empty">No Brainrot deposits found.</td></tr> : brainrotDeposits.map((deposit) => { const id=String(deposit.id); const draft=brainrotDepositDrafts[id] || {}; return <tr key={deposit.id}><td>#{deposit.id}</td><td><strong>{deposit.username}</strong><small>#{deposit.user_id}</small></td><td><code className="admin-brainrot-code">{deposit.deposit_code}</code></td><td>{deposit.status === "pending" ? <textarea className="admin-brainrot-textarea" value={draft.itemsDescription || ""} onChange={(e) => updateBrainrotDepositDraft(deposit.id,"itemsDescription",e.target.value)} placeholder="e.g. Rainbow Garama, Garama..."/> : <span>{deposit.items_description || "—"}</span>}</td><td>{deposit.status === "pending" ? <div className="admin-brainrot-amount-wrap"><span>$</span><input type="number" min="0" step="0.01" value={Number(draft.amountCents || 0)/100} onChange={(e) => updateBrainrotDepositDraft(deposit.id,"amountCents",Math.round(Number(e.target.value || 0)*100))}/></div> : <span className="admin-table-money">{money(deposit.amount_cents)}</span>}</td><td><span className={`admin-payment-status ${deposit.status}`}>{deposit.status}</span></td><td>{deposit.status === "pending" ? <textarea className="admin-brainrot-textarea" value={draft.staffNote || ""} onChange={(e) => updateBrainrotDepositDraft(deposit.id,"staffNote",e.target.value)} placeholder="Optional internal note..."/> : <span className="admin-table-muted">{deposit.staff_note || "—"}</span>}</td><td>{deposit.status === "pending" ? <div className="admin-payment-actions"><button className="admin-payment-approve" onClick={() => reviewBrainrotDeposit(deposit,"approve")} disabled={saving}>✓ Credit</button><button className="admin-payment-reject" onClick={() => reviewBrainrotDeposit(deposit,"reject")} disabled={saving}>× Reject</button></div> : <span className="admin-table-muted">{deposit.reviewer_username || "Reviewed"}</span>}</td></tr>; })}
+              </tbody></table></div>
+            </div>
+          </section>
         )}
 
         {adminView === "security" && (
@@ -6193,7 +5644,7 @@ body: JSON.stringify({
                 <h2>Case Assets</h2>
                 <p>Manage reusable reward assets that can be placed into any case.</p>
               </div>
-              <button className="admin-primary-button" onClick={() => { setNewItem({ name: "", rarity: "Common", value: "", imageUrl: "", gameSlug: "steal-a-brainrot" }); setShowCreateItem(true); }}>+ Add Asset</button>
+              <button className="admin-primary-button" onClick={() => { setNewItem({ name: "", rarity: "Common", value: "", imageUrl: "" }); setShowCreateItem(true); }}>+ Add Asset</button>
             </div>
             <div className="admin-management-body">
               <div className="admin-management-toolbar">
@@ -6272,8 +5723,6 @@ body: JSON.stringify({
             </div>
           </section>
         )}
-
-        {adminView === "marketplace" && <AdminMarketplacePanel />}
 
         {adminView === "cases" && (
         <div className="admin-layout">
@@ -6456,7 +5905,6 @@ body: JSON.stringify({
                       </strong>
 
                       <span>
-                        <span className={`admin-game-badge ${item.game_theme === "blue" ? "blue" : "purple"}`}>{item.game_name || item.game_slug || "Game"}</span>
                         {money(
                           item.price_cents
                         )}{" "}
@@ -6668,27 +6116,6 @@ body: JSON.stringify({
                           )
                         }
                       />
-                    </label>
-
-                    <label>
-                      <span>Game</span>
-
-                      <select
-                        value={editingCase.gameSlug}
-                        onChange={(event) =>
-                          setEditingCase((current) => ({
-                            ...current,
-                            gameSlug: event.target.value,
-                          }))
-                        }
-                        disabled={saving}
-                      >
-                        {GAME_OPTIONS.map((game) => (
-                          <option key={game.slug} value={game.slug}>
-                            {game.name}
-                          </option>
-                        ))}
-                      </select>
                     </label>
 
                     <label>
@@ -7183,25 +6610,6 @@ body: JSON.stringify({
               rewards.
             </p>
 
-            <label>
-              <span>Game</span>
-              <select
-                value={newCase.gameSlug}
-                onChange={(event) =>
-                  setNewCase((current) => ({
-                    ...current,
-                    gameSlug: event.target.value,
-                  }))
-                }
-              >
-                {GAME_OPTIONS.map((game) => (
-                  <option key={game.slug} value={game.slug}>
-                    {game.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-
             <form
               onSubmit={createCase}
               className="admin-modal-form"
@@ -7686,26 +7094,6 @@ body: JSON.stringify({
               </label>
 
               <label>
-                <span>Game</span>
-
-                <select
-                  value={newItem.gameSlug}
-                  onChange={(event) =>
-                    setNewItem((current) => ({
-                      ...current,
-                      gameSlug: event.target.value,
-                    }))
-                  }
-                >
-                  {GAME_OPTIONS.map((game) => (
-                    <option key={game.slug} value={game.slug}>
-                      {game.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label>
                 <span>Rarity</span>
 
                 <select
@@ -7957,81 +7345,6 @@ body: JSON.stringify({
           </div>
         </div>
       )}
-      {adminMinesDetail && (
-        <div
-          className="admin-modal-backdrop admin-mines-detail-backdrop"
-          onMouseDown={() => setAdminMinesDetail(null)}
-        >
-          <div
-            className="admin-modal admin-mines-detail-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="admin-mines-detail-title"
-            onMouseDown={(event) => event.stopPropagation()}
-          >
-            <div className="admin-modal-head">
-              <div>
-                <div className="admin-eyebrow">MINES GAME DETAILS</div>
-                <h3 id="admin-mines-detail-title">Mines Game #{adminMinesDetail.gameId}</h3>
-              </div>
-              <button
-                type="button"
-                className="admin-modal-close"
-                onClick={() => setAdminMinesDetail(null)}
-                aria-label="Close Mines details"
-              >
-                ×
-              </button>
-            </div>
-
-            <div className="admin-mines-detail-summary">
-              <div><span>USER</span><strong>{adminMinesDetail.username}</strong></div>
-              <div><span>BET</span><strong>{money(adminMinesDetail.betCents)}</strong></div>
-              <div><span>GRID</span><strong>{adminMinesDetail.gridSize} × {adminMinesDetail.gridSize}</strong></div>
-              <div><span>MINES</span><strong>{adminMinesDetail.mineCount}</strong></div>
-              <div><span>TILES CLICKED</span><strong>{adminMinesDetail.revealedCount}</strong></div>
-              <div><span>RESULT</span><strong className={adminMinesDetail.status === "lost" ? "admin-mines-result-loss" : "admin-mines-result-win"}>{adminMinesDetail.status === "lost" ? "Hit Mine" : adminMinesDetail.status === "cashed_out" ? "Cashed Out" : String(adminMinesDetail.status || "Unknown")}</strong></div>
-              <div><span>MULTIPLIER</span><strong>{Number(adminMinesDetail.multiplier || 0).toFixed(2)}x</strong></div>
-              <div><span>PAYOUT</span><strong>{money(adminMinesDetail.payoutCents)}</strong></div>
-            </div>
-
-            <div className="admin-mines-board-wrap">
-              <div className="admin-mines-board-title">FINAL BOARD</div>
-              <div
-                className="admin-mines-detail-board"
-                style={{ gridTemplateColumns: `repeat(${Number(adminMinesDetail.gridSize || 5)}, minmax(0, 1fr))` }}
-              >
-                {Array.from({ length: Number(adminMinesDetail.gridSize || 5) ** 2 }, (_, index) => {
-                  const revealed = new Set((adminMinesDetail.revealedPositions || []).map(Number)).has(index);
-                  const mine = new Set((adminMinesDetail.minePositions || []).map(Number)).has(index);
-                  const clickedMine = mine && revealed;
-
-                  return (
-                    <div
-                      key={index}
-                      className={[
-                        "admin-mines-detail-tile",
-                        mine ? "mine" : "safe",
-                        revealed ? "revealed" : "hidden",
-                        clickedMine ? "clicked-mine" : "",
-                      ].filter(Boolean).join(" ")}
-                    >
-                      <span>{mine ? "✕" : revealed ? "✓" : "?"}</span>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="admin-mines-board-legend">
-                <span><i className="safe-dot"></i> Revealed safe</span>
-                <span><i className="mine-dot"></i> Mine</span>
-                <span><i className="hidden-dot"></i> Not clicked</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {adminInventoryBulkModalOpen && selectedUser && (
         <div className="admin-modal-backdrop" onMouseDown={() => !adminInventoryBulkWorking && setAdminInventoryBulkModalOpen(false)}>
           <div
