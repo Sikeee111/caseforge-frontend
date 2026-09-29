@@ -1922,7 +1922,7 @@ export default function GamePortal({
                           className="game-portal-brainrot-deposit-discord"
                           onClick={() =>
                             window.open(
-                              "https://discord.gg/7hsugeanWk",
+                              "https://https://discord.gg/6t9bzvnndd",
                               "_blank",
                               "noopener,noreferrer"
                             )
