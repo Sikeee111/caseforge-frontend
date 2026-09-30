@@ -14358,9 +14358,18 @@ setSellConfirmItem({
   }
 
   .wallet-modal-backdrop .casex-clean-balance{
-    margin-left:auto !important;
-    color:#969ba5 !important;
-    font-size:10px !important;
+    position:absolute !important;
+    left:50% !important;
+    top:50% !important;
+    transform:translate(-50%,-50%) !important;
+    margin:0 !important;
+    color:#f1f3f6 !important;
+    font-size:12px !important;
+    font-weight:800 !important;
+    line-height:1 !important;
+    pointer-events:none !important;
+    white-space:nowrap !important;
+    z-index:1 !important;
   }
 
   .wallet-modal-backdrop .casex-clean-coin{
