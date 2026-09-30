@@ -1699,7 +1699,7 @@ export default function GamePortal({
                           </div>
                           <span className="game-portal-item-rarity">{item.rarity}</span>
                           <h3>{item.name}</h3>
-                          <div className="game-portal-item-meta"><span>Value {money(item.valueCents)}</span><span>Stock {item.stock}</span></div>
+                          <div className="game-portal-item-meta"><span>Stock {item.stock}</span></div>
                           <div className="game-portal-item-buy"><strong>{money(item.priceCents)}</strong><button type="button" disabled={buyingId === Number(item.id) || !canAfford} onClick={() => requestBuyItem(item)}>{buyingId === Number(item.id) ? "Buying..." : canAfford ? "Buy Now" : "Insufficient balance"}</button></div>
                         </article>
                       );
