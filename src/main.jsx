@@ -1953,8 +1953,96 @@ function ColorDicingGame({ authUser, balance, openAuth, onBalanceChange }) {
   );
 }
 
+
+
+function getCasexStoredCase(caseId) {
+  if (
+    typeof window === "undefined" ||
+    !caseId ||
+    !window.sessionStorage
+  ) {
+    return null;
+  }
+
+  try {
+    const raw = window.sessionStorage.getItem(
+      `CaseX_case_snapshot_${String(caseId)}`
+    );
+
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw);
+
+    if (
+      !parsed ||
+      Number(parsed.id) !== Number(caseId)
+    ) {
+      return null;
+    }
+
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function saveCasexCaseSnapshot(caseData) {
+  if (
+    typeof window === "undefined" ||
+    !window.sessionStorage ||
+    !caseData?.id
+  ) {
+    return;
+  }
+
+  try {
+    window.sessionStorage.setItem(
+      `CaseX_case_snapshot_${String(caseData.id)}`,
+      JSON.stringify(caseData)
+    );
+  } catch {
+    // Ignore unavailable/full session storage.
+  }
+}
+
+function getCasexRouteState() {
+  if (typeof window === "undefined") {
+    return {
+      page: "home",
+      game: null,
+      tab: "marketplace",
+    };
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  const page = String(params.get("page") || "home").toLowerCase();
+  const game = params.get("game") || null;
+  const requestedTab = String(params.get("tab") || "marketplace").toLowerCase();
+  const caseId = params.get("case") || null;
+  const allowedTabs = new Set([
+    "marketplace",
+    "cases",
+    "inventory",
+    "deposit",
+    "withdraw",
+    "home",
+  ]);
+
+  return {
+    page,
+    game,
+    caseId,
+    tab: allowedTabs.has(requestedTab) ? requestedTab : "marketplace",
+  };
+}
+
 function App() {
   useScrollReveal();
+
+  // Restore the active CASEX surface from the URL before React renders.
+  // This makes refreshes keep the user on the page they were viewing.
+  const initialRoute = getCasexRouteState();
+
   const [balance, setBalance] = useState(100);
 
   const [authUser, setAuthUser] = useState(null);
@@ -2252,13 +2340,34 @@ function App() {
   const [cryptoPayment, setCryptoPayment] = useState(null);
   const [brainrotDeposit, setBrainrotDeposit] = useState(null);
   const [brainrotDepositLoading, setBrainrotDepositLoading] = useState(false);
-  const [selected, setSelected] = useState(null);
-  const [casesPageOpen, setCasesPageOpen] = useState(false);
+  const [selected, setSelected] = useState(() =>
+    initialRoute.page === "case"
+      ? getCasexStoredCase(initialRoute.caseId)
+      : null
+  );
+  const [caseRestorePending, setCaseRestorePending] = useState(
+    () =>
+      initialRoute.page === "case" &&
+      !!initialRoute.caseId &&
+      !getCasexStoredCase(initialRoute.caseId)
+  );
+  const [casesPageOpen, setCasesPageOpen] = useState(
+    () => initialRoute.page === "cases"
+  );
   const [colorDicingOpen, setColorDicingOpen] = useState(false);
-  const [gamePortalOpen, setGamePortalOpen] = useState(false);
+  const [gamePortalOpen, setGamePortalOpen] = useState(
+    () => initialRoute.page === "games"
+  );
   const [gameMenuOpen, setGameMenuOpen] = useState(false);
   const [d4SidebarOpen, setD4SidebarOpen] = useState(true);
-  const [d4SidebarSection, setD4SidebarSection] = useState("home");
+  const [d4SidebarSection, setD4SidebarSection] = useState(() => {
+    if (initialRoute.page === "games") return "games";
+    if (initialRoute.page === "original") return "originals";
+    if (initialRoute.page === "jackpot") return "jackpot";
+    if (initialRoute.page === "cases") return "cases";
+    if (initialRoute.page === "dicing") return "originals";
+    return "home";
+  });
 
   // Keep the global sidebar state available to every full-screen surface,
   // including Game Portal and Original Games, even when the homepage <main>
@@ -2273,10 +2382,20 @@ function App() {
     };
   }, [d4SidebarOpen]);
   const [originalsMenuOpen, setOriginalsMenuOpen] = useState(false);
-  const [originalGameOpen, setOriginalGameOpen] = useState(null);
-  const [jackpotPageOpen, setJackpotPageOpen] = useState(false);
-  const [gamePortalGame, setGamePortalGame] = useState(null);
-  const [gamePortalTab, setGamePortalTab] = useState("marketplace");
+  const [originalGameOpen, setOriginalGameOpen] = useState(() => {
+    if (initialRoute.page === "dicing") return "dicing";
+    if (initialRoute.page === "original") return initialRoute.game || "towers";
+    return null;
+  });
+  const [jackpotPageOpen, setJackpotPageOpen] = useState(
+    () => initialRoute.page === "jackpot"
+  );
+  const [gamePortalGame, setGamePortalGame] = useState(
+    () => initialRoute.game
+  );
+  const [gamePortalTab, setGamePortalTab] = useState(
+    () => initialRoute.tab
+  );
   const gamePortalReturnGameRef = useRef(null);
   const [casesSearch, setCasesSearch] = useState("");
   const [casesGameFilter, setCasesGameFilter] = useState("all");
@@ -2376,6 +2495,190 @@ const [authForm, setAuthForm] = useState({
   const audioContextRef = useRef(null);
   const soundGainRef = useRef(null);
   const soundTimerRef = useRef(null);
+
+  // Keep the current full-screen surface encoded in the URL so a browser
+  // refresh restores the same place instead of returning to the homepage.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    let page = "home";
+    let game = null;
+    let tab = null;
+
+    if (selected?.id) {
+      page = "case";
+      game = gamePortalReturnGameRef.current || selected?.game_slug || initialRoute.game;
+    } else if (caseRestorePending && initialRoute.page === "case") {
+      // Keep the case URL intact while the case data is being restored.
+      return;
+    } else if (gamePortalOpen) {
+      page = "games";
+      game = gamePortalGame;
+      tab = gamePortalTab || "marketplace";
+    } else if (originalGameOpen) {
+      page = originalGameOpen === "dicing" ? "dicing" : "original";
+      game = originalGameOpen === "dicing" ? null : originalGameOpen;
+    } else if (jackpotPageOpen) {
+      page = "jackpot";
+    } else if (casesPageOpen) {
+      page = "cases";
+    } else if (colorDicingOpen) {
+      page = "dicing";
+    }
+
+    const params = new URLSearchParams();
+    if (page !== "home") params.set("page", page);
+    if (game) params.set("game", game);
+    if (page === "case" && selected?.id) {
+      params.set("case", String(selected.id));
+    }
+    if (tab && page === "games") params.set("tab", tab);
+
+    const query = params.toString();
+    const nextUrl = `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`;
+    const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+
+    if (nextUrl !== currentUrl) {
+      window.history.replaceState({}, "", nextUrl);
+    }
+  }, [
+    selected,
+    caseRestorePending,
+    gamePortalOpen,
+    gamePortalGame,
+    gamePortalTab,
+    originalGameOpen,
+    jackpotPageOpen,
+    casesPageOpen,
+    colorDicingOpen,
+  ]);
+
+  // Restore the exact case page after a browser refresh.
+  //
+  // A session snapshot is used immediately so the browser never renders the
+  // homepage/original-games surface while the case API request is in flight.
+  // The API request still runs in the background to refresh the case data.
+  useEffect(() => {
+    if (
+      initialRoute.page !== "case" ||
+      !initialRoute.caseId
+    ) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const restoreCase = async () => {
+      try {
+        const response = await apiFetch(
+          `${API}/api/cases/${encodeURIComponent(initialRoute.caseId)}`,
+          { cache: "no-store" }
+        );
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            data?.error || "Failed to restore case"
+          );
+        }
+
+        const rewards = Array.isArray(data.items)
+          ? data.items.map((item) => ({
+              ...item,
+              id: Number(item.id),
+              value_cents: Number(
+                item.value_cents ?? item.valueCents ?? 0
+              ),
+              valueCents: Number(
+                item.value_cents ?? item.valueCents ?? 0
+              ),
+              image_url:
+                item.image_url ??
+                item.imageUrl ??
+                "",
+              imageUrl:
+                item.image_url ??
+                item.imageUrl ??
+                "",
+            }))
+          : [];
+
+        const restoredCase = {
+          ...(data.case || {}),
+          id: Number(
+            data.case?.id ?? initialRoute.caseId
+          ),
+          price:
+            Number(data.case?.price_cents ?? 0) / 100,
+          price_cents: Number(
+            data.case?.price_cents ?? 0
+          ),
+          image_url:
+            data.case?.image_url ??
+            data.case?.imageUrl ??
+            "",
+          imageUrl:
+            data.case?.image_url ??
+            data.case?.imageUrl ??
+            "",
+          items: rewards,
+        };
+
+        if (cancelled) return;
+
+        gamePortalReturnGameRef.current =
+          initialRoute.game ||
+          data.case?.game_slug ||
+          "steal-a-brainrot";
+
+        // Refresh the cached snapshot for the next refresh, but do not run
+        // another page transition here. The case page is already visible.
+        saveCasexCaseSnapshot(restoredCase);
+        setSelected(restoredCase);
+        setCasesPageOpen(false);
+        setGamePortalOpen(false);
+        setGamePortalGame(null);
+        setGamePortalTab("marketplace");
+        setCaseRestorePending(false);
+      } catch (error) {
+        if (cancelled) return;
+
+        console.error(
+          "Case refresh restore failed:",
+          error
+        );
+
+        // If a snapshot exists, keep showing it rather than flashing the
+        // homepage. Only fall back to Cases when there is nothing usable.
+        const cachedCase = getCasexStoredCase(initialRoute.caseId);
+
+        if (cachedCase) {
+          gamePortalReturnGameRef.current =
+            initialRoute.game ||
+            cachedCase.game_slug ||
+            "steal-a-brainrot";
+          setSelected(cachedCase);
+          setCaseRestorePending(false);
+          return;
+        }
+
+        setCaseRestorePending(false);
+        setSelected(null);
+        setCasesPageOpen(true);
+        window.scrollTo({
+          top: 0,
+          left: 0,
+          behavior: "auto",
+        });
+      }
+    };
+
+    restoreCase();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [initialRoute.page, initialRoute.caseId, initialRoute.game]);
 
   useEffect(() => {
     try {
@@ -3694,12 +3997,25 @@ const openAuth = (mode = "login") => {
         rewards
       );
 
-      setSelected({
+      const openedCase = {
         ...c,
         ...(data.case || {}),
-        image_url: data.case?.image_url || c.image_url || c.imageUrl || "",
+        id: Number(data.case?.id ?? c.id),
+        image_url:
+          data.case?.image_url ||
+          c.image_url ||
+          c.imageUrl ||
+          "",
+        imageUrl:
+          data.case?.image_url ||
+          c.image_url ||
+          c.imageUrl ||
+          "",
         items: rewards,
-      });
+      };
+
+      saveCasexCaseSnapshot(openedCase);
+      setSelected(openedCase);
     } catch (error) {
       console.error("Case preview failed:", error);
       alert(error.message);
@@ -5056,6 +5372,8 @@ useEffect(() => {
        * applies both state changes in one update, and then crossfades
        * directly into the existing CaseX case page.
        */
+      saveCasexCaseSnapshot(normalizedCase);
+
       runSmoothPageTransition(() => {
         setSelected(normalizedCase);
         setGamePortalOpen(false);
@@ -8164,6 +8482,51 @@ useEffect(() => {
 
         /* Game Portal is a full-screen overlay. Reserve the fixed sidebar
            so its content never renders underneath the navigation. */
+        /* ============================================================
+           CASEX — INSTANT CASE REFRESH RESTORE
+           Never expose the homepage while a cold case restore is loading.
+           ============================================================ */
+        .casex-case-restore-screen{
+          position:fixed !important;
+          inset:0 !important;
+          z-index:4000 !important;
+          display:flex !important;
+          align-items:center !important;
+          justify-content:center !important;
+          padding-left:236px !important;
+          box-sizing:border-box !important;
+          background:#08090d !important;
+        }
+
+        .casex-case-restore-card{
+          display:flex;
+          flex-direction:column;
+          align-items:center;
+          gap:12px;
+          color:#8f879e;
+          font-size:12px;
+          font-weight:700;
+        }
+
+        .casex-case-restore-spinner{
+          width:28px;
+          height:28px;
+          border:2px solid rgba(157,111,255,.18);
+          border-top-color:#9d6fff;
+          border-radius:50%;
+          animation:casexCaseRestoreSpin .72s linear infinite;
+        }
+
+        @keyframes casexCaseRestoreSpin{
+          to{transform:rotate(360deg)}
+        }
+
+        @media(max-width:700px){
+          .casex-case-restore-screen{
+            padding-left:184px !important;
+          }
+        }
+
         body.casex-global-sidebar-open .game-portal-overlay{
           padding-left:236px !important;
           box-sizing:border-box !important;
@@ -8178,6 +8541,26 @@ useEffect(() => {
            fixed navigation width. */
         body.casex-global-sidebar-open .casex-d4-original-game-stage{
           margin-left:0 !important;
+        }
+
+        /* All Cases is a fixed full-screen page, so the normal main
+           padding cannot reserve space for the fixed global sidebar.
+           Shift the fixed Cases surface itself so the sidebar never
+           covers its controls or case cards. */
+        @media(min-width:701px){
+          body.casex-global-sidebar-open .all-cases-page{
+            left:236px !important;
+            right:0 !important;
+            width:auto !important;
+          }
+        }
+
+        @media(max-width:700px){
+          body.casex-global-sidebar-open .all-cases-page{
+            left:184px !important;
+            right:0 !important;
+            width:auto !important;
+          }
         }
 
         @media(max-width:700px){
@@ -8203,7 +8586,18 @@ useEffect(() => {
         }
       `}</style>
 
-      <main id="home" className={`homepage-redesign casex-design4-main ${jackpotPageOpen ? "jackpot-page-root" : ""} ${d4SidebarOpen ? "casex-d4-sidebar-open" : "casex-d4-sidebar-closed"}`} style={{ display: originalGameOpen || colorDicingOpen ? "none" : undefined }}>
+      <main
+        id="home"
+        className={`homepage-redesign casex-design4-main ${jackpotPageOpen ? "jackpot-page-root" : ""} ${d4SidebarOpen ? "casex-d4-sidebar-open" : "casex-d4-sidebar-closed"}`}
+        style={{
+          display:
+            originalGameOpen ||
+            colorDicingOpen ||
+            (caseRestorePending && !selected)
+              ? "none"
+              : undefined,
+        }}
+      >
         <div className="casex-d4-content">
         <section className="hero">
           <div className="hero-glow"></div>
@@ -10880,6 +11274,15 @@ useEffect(() => {
                 })()}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {caseRestorePending && !selected && (
+        <div className="casex-case-restore-screen">
+          <div className="casex-case-restore-card">
+            <div className="casex-case-restore-spinner"></div>
+            <span>Loading case...</span>
           </div>
         </div>
       )}
