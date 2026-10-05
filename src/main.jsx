@@ -7868,14 +7868,16 @@ useEffect(() => {
                       </button>
                     )}
 
-                    <a
-                      href="#inventory"
-                      className="profile-item"
-                      onClick={() =>
-                        setProfileOpen(
-                          false
-                        )
-                      }
+                    <button
+                      type="button"
+                      className="profile-item profile-button"
+                      onClick={() => {
+                        setProfileOpen(false);
+                        setAccountStatsOpen(false);
+                        closeOriginalGame();
+                        setD4SidebarSection("inventory");
+                        openGamePortal("steal-a-brainrot", "inventory");
+                      }}
                     >
                       <span className="profile-item-icon">
                         🎒
@@ -7900,7 +7902,7 @@ useEffect(() => {
                       <span className="profile-arrow">
                         →
                       </span>
-                    </a>
+                    </button>
 
                     <button
                       type="button"
@@ -8376,14 +8378,7 @@ useEffect(() => {
 
         <button
           type="button"
-          className={`casex-d4-side-link ${
-            d4SidebarSection === "inventory" &&
-            gamePortalOpen &&
-            gamePortalGame === "steal-a-brainrot" &&
-            gamePortalTab === "inventory"
-              ? "active"
-              : ""
-          }`}
+          className={`casex-d4-side-link ${gamePortalOpen && gamePortalGame === "steal-a-brainrot" && gamePortalTab === "inventory" ? "active" : ""}`}
           onClick={() => {
             if (opening) return;
             closeOriginalGame();
