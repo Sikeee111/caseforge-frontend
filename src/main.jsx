@@ -8374,6 +8374,26 @@ useEffect(() => {
           <span>▣</span> Cases
         </button>
 
+        <button
+          type="button"
+          className={`casex-d4-side-link ${
+            d4SidebarSection === "inventory" &&
+            gamePortalOpen &&
+            gamePortalGame === "steal-a-brainrot" &&
+            gamePortalTab === "inventory"
+              ? "active"
+              : ""
+          }`}
+          onClick={() => {
+            if (opening) return;
+            closeOriginalGame();
+            setD4SidebarSection("inventory");
+            openGamePortal("steal-a-brainrot", "inventory");
+          }}
+        >
+          <span>▤</span> Inventory
+        </button>
+
         <div className="casex-d4-side-label">ORIGINAL GAMES</div>
 
         <button
