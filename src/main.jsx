@@ -2015,6 +2015,21 @@ function getCasexRouteState() {
   }
 
   const params = new URLSearchParams(window.location.search);
+  const legacyHash = String(window.location.hash || "")
+    .replace(/^#\/?/, "")
+    .toLowerCase();
+
+  // Older Inventory links used #inventory instead of the Game Portal state.
+  // Treat that legacy URL as the real Steal a Brainrot Inventory page.
+  if (legacyHash === "inventory") {
+    return {
+      page: "games",
+      game: "steal-a-brainrot",
+      tab: "inventory",
+      caseId: null,
+    };
+  }
+
   const page = String(params.get("page") || "home").toLowerCase();
   const game = params.get("game") || null;
   const requestedTab = String(params.get("tab") || "marketplace").toLowerCase();
@@ -2397,6 +2412,35 @@ function App() {
     () => initialRoute.tab
   );
   const gamePortalReturnGameRef = useRef(null);
+
+  // Backwards-compatible bridge for any cached/older Inventory link that
+  // still points to #inventory. Clicking it must immediately open the same
+  // Game Portal Inventory screen instead of leaving the user on Home.
+  useEffect(() => {
+    const handleInventoryHash = () => {
+      const legacyHash = String(window.location.hash || "")
+        .replace(/^#\/?/, "")
+        .toLowerCase();
+
+      if (legacyHash !== "inventory") return;
+
+      closeOriginalGame();
+      setD4SidebarSection("inventory");
+      openGamePortal("steal-a-brainrot", "inventory");
+    };
+
+    if (
+      String(window.location.hash || "")
+        .replace(/^#\/?/, "")
+        .toLowerCase() === "inventory"
+    ) {
+      handleInventoryHash();
+    }
+
+    window.addEventListener("hashchange", handleInventoryHash);
+    return () => window.removeEventListener("hashchange", handleInventoryHash);
+  }, []);
+
   const [casesSearch, setCasesSearch] = useState("");
   const [casesGameFilter, setCasesGameFilter] = useState("all");
   const [casesTagFilter, setCasesTagFilter] = useState("All");
@@ -2535,7 +2579,16 @@ const [authForm, setAuthForm] = useState({
     if (tab && page === "games") params.set("tab", tab);
 
     const query = params.toString();
-    const nextUrl = `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`;
+
+    const legacyHash = String(window.location.hash || "")
+      .replace(/^#\/?/, "")
+      .toLowerCase();
+
+    const preservedHash = legacyHash === "inventory"
+      ? ""
+      : window.location.hash;
+
+    const nextUrl = `${window.location.pathname}${query ? `?${query}` : ""}${preservedHash}`;
     const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
 
     if (nextUrl !== currentUrl) {
@@ -7868,16 +7921,14 @@ useEffect(() => {
                       </button>
                     )}
 
-                    <button
-                      type="button"
-                      className="profile-item profile-button"
-                      onClick={() => {
-                        setProfileOpen(false);
-                        setAccountStatsOpen(false);
-                        closeOriginalGame();
-                        setD4SidebarSection("inventory");
-                        openGamePortal("steal-a-brainrot", "inventory");
-                      }}
+                    <a
+                      href="#inventory"
+                      className="profile-item"
+                      onClick={() =>
+                        setProfileOpen(
+                          false
+                        )
+                      }
                     >
                       <span className="profile-item-icon">
                         🎒
@@ -7902,7 +7953,7 @@ useEffect(() => {
                       <span className="profile-arrow">
                         →
                       </span>
-                    </button>
+                    </a>
 
                     <button
                       type="button"
@@ -8374,19 +8425,6 @@ useEffect(() => {
           }}
         >
           <span>▣</span> Cases
-        </button>
-
-        <button
-          type="button"
-          className={`casex-d4-side-link ${gamePortalOpen && gamePortalGame === "steal-a-brainrot" && gamePortalTab === "inventory" ? "active" : ""}`}
-          onClick={() => {
-            if (opening) return;
-            closeOriginalGame();
-            setD4SidebarSection("inventory");
-            openGamePortal("steal-a-brainrot", "inventory");
-          }}
-        >
-          <span>▤</span> Inventory
         </button>
 
         <div className="casex-d4-side-label">ORIGINAL GAMES</div>
