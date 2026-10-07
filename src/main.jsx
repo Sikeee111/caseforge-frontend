@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import "./styles.css";
 import Admin from "./admin.jsx";
 import GamePortal from "./GamePortal.jsx";
+import Deal from "./Deal.jsx";
 import OriginalGames from "./OriginalGames.jsx";
 import "./game-portal.css";
 
@@ -2373,6 +2374,9 @@ function App() {
   const [gamePortalOpen, setGamePortalOpen] = useState(
     () => initialRoute.page === "games"
   );
+  const [dealOpen, setDealOpen] = useState(
+    () => initialRoute.page === "deal"
+  );
   const [gameMenuOpen, setGameMenuOpen] = useState(false);
   const [d4SidebarOpen, setD4SidebarOpen] = useState(true);
   const [d4SidebarSection, setD4SidebarSection] = useState(() => {
@@ -2381,6 +2385,7 @@ function App() {
     if (initialRoute.page === "jackpot") return "jackpot";
     if (initialRoute.page === "cases") return "cases";
     if (initialRoute.page === "dicing") return "originals";
+    if (initialRoute.page === "deal") return "deal";
     return "home";
   });
 
@@ -2559,6 +2564,8 @@ const [authForm, setAuthForm] = useState({
       page = "games";
       game = gamePortalGame;
       tab = gamePortalTab || "marketplace";
+    } else if (dealOpen) {
+      page = "deal";
     } else if (originalGameOpen) {
       page = originalGameOpen === "dicing" ? "dicing" : "original";
       game = originalGameOpen === "dicing" ? null : originalGameOpen;
@@ -2600,6 +2607,7 @@ const [authForm, setAuthForm] = useState({
     gamePortalOpen,
     gamePortalGame,
     gamePortalTab,
+    dealOpen,
     originalGameOpen,
     jackpotPageOpen,
     casesPageOpen,
@@ -5208,6 +5216,7 @@ useEffect(() => {
     setGamePortalOpen(false);
     setGamePortalGame(null);
     setGamePortalTab("marketplace");
+    setDealOpen(false);
     setSelected(null);
     setResult(null);
     setWonInventoryId(null);
@@ -5238,6 +5247,7 @@ useEffect(() => {
 
   const openColorDicing = () => {
     if (opening) return;
+    setDealOpen(false);
     setOriginalGameOpen("dicing");
     setGameMenuOpen(false);
     setOriginalsMenuOpen(false);
@@ -5289,6 +5299,7 @@ useEffect(() => {
     setGamePortalOpen(false);
     setGamePortalGame(null);
     setGamePortalTab("marketplace");
+    setDealOpen(false);
     setCasesPageOpen(false);
     setSelected(null);
     setResult(null);
@@ -5303,6 +5314,39 @@ useEffect(() => {
     setOriginalGameOpen(null);
   };
 
+  const openDeal = () => {
+    if (opening) return;
+
+    setOriginalGameOpen(null);
+    setGameMenuOpen(false);
+    setOriginalsMenuOpen(false);
+    setJackpotPageOpen(false);
+    setProfileOpen(false);
+    setColorDicingOpen(false);
+    setCasesPageOpen(false);
+    setGamePortalOpen(false);
+    setGamePortalGame(null);
+    setGamePortalTab("marketplace");
+    setSelected(null);
+    setResult(null);
+    setDealOpen(true);
+    setD4SidebarSection("deal");
+
+    requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    });
+  };
+
+  const closeDeal = () => {
+    if (opening) return;
+    setDealOpen(false);
+    setD4SidebarSection("home");
+
+    requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    });
+  };
+
   const openGamePortal = (gameSlug = null, tab = "marketplace") => {
     setOriginalGameOpen(null);
     if (opening) return;
@@ -5311,6 +5355,7 @@ useEffect(() => {
     setJackpotPageOpen(false);
     setProfileOpen(false);
     setColorDicingOpen(false);
+    setDealOpen(false);
     setCasesPageOpen(false);
     setSelected(null);
     setResult(null);
@@ -5339,6 +5384,7 @@ useEffect(() => {
     setGamePortalGame(null);
     setGamePortalTab("marketplace");
     setColorDicingOpen(false);
+    setDealOpen(false);
     setCasesPageOpen(false);
     setSelected(null);
     setResult(null);
@@ -5454,6 +5500,7 @@ useEffect(() => {
   const openCasesPage = () => {
     setColorDicingOpen(false);
     setJackpotPageOpen(false);
+    setDealOpen(false);
     if (opening) return;
     setSelected(null);
     setResult(null);
@@ -8294,6 +8341,16 @@ useEffect(() => {
         }
       `}</style>
 
+      <Deal
+        open={dealOpen}
+        authUser={authUser}
+        balance={balance}
+        onClose={closeDeal}
+        onBalanceChange={setBalance}
+        onRefreshInventory={loadInventory}
+        openAuth={openAuth}
+      />
+
       <GamePortal
         open={gamePortalOpen}
         initialGame={gamePortalGame}
@@ -8343,14 +8400,23 @@ useEffect(() => {
           <span>◫</span> Games
         </button>
 
+        <button
+          type="button"
+          className={`casex-d4-side-link ${dealOpen ? "active" : ""}`}
+          onClick={openDeal}
+        >
+          <span>✦</span> Deal
+        </button>
+
         <div className="casex-d4-side-label">MAIN</div>
 
         <button
           type="button"
-          className={`casex-d4-side-link ${d4SidebarSection === "home" && !gamePortalOpen && !originalGameOpen ? "active" : ""}`}
+          className={`casex-d4-side-link ${d4SidebarSection === "home" && !gamePortalOpen && !originalGameOpen && !dealOpen ? "active" : ""}`}
           onClick={() => {
             closeGamePortal();
             closeOriginalGame();
+            closeDeal();
             setD4SidebarSection("home");
             window.scrollTo({ top: 0, behavior: "smooth" });
           }}
@@ -8360,10 +8426,11 @@ useEffect(() => {
 
         <button
           type="button"
-          className={`casex-d4-side-link ${d4SidebarSection === "originals" && !originalGameOpen ? "active" : ""}`}
+          className={`casex-d4-side-link ${d4SidebarSection === "originals" && !originalGameOpen && !dealOpen ? "active" : ""}`}
           onClick={() => {
             closeGamePortal();
             closeOriginalGame();
+            closeDeal();
             setD4SidebarSection("originals");
             window.setTimeout(() => {
               document.getElementById("original-games")?.scrollIntoView({
@@ -8378,10 +8445,11 @@ useEffect(() => {
 
         <button
           type="button"
-          className={`casex-d4-side-link ${d4SidebarSection === "marketplace" && !gamePortalOpen ? "active" : ""}`}
+          className={`casex-d4-side-link ${d4SidebarSection === "marketplace" && !gamePortalOpen && !dealOpen ? "active" : ""}`}
           onClick={() => {
             closeGamePortal();
             closeOriginalGame();
+            closeDeal();
             setD4SidebarSection("marketplace");
             window.setTimeout(() => {
               const marketplaceSection = document.getElementById("marketplace");
@@ -8411,10 +8479,11 @@ useEffect(() => {
 
         <button
           type="button"
-          className={`casex-d4-side-link ${d4SidebarSection === "cases" && !gamePortalOpen ? "active" : ""}`}
+          className={`casex-d4-side-link ${d4SidebarSection === "cases" && !gamePortalOpen && !dealOpen ? "active" : ""}`}
           onClick={() => {
             closeGamePortal();
             closeOriginalGame();
+            closeDeal();
             setD4SidebarSection("cases");
             window.setTimeout(() => {
               document.getElementById("cases")?.scrollIntoView({
