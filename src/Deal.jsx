@@ -176,7 +176,7 @@ function DealRing({ probability, spinning, spinTargetAngle, result }) {
         frameRef.current = null;
       }
     };
-  }, [spinning, resolvedTargetAngle, result, resolvedResultAngle]);
+  }, [spinning, resolvedTargetAngle]);
 
   useEffect(() => {
     return () => {
@@ -274,6 +274,7 @@ export default function Deal({
   const [betInput, setBetInput] = useState("10.00");
   const [loadingItems, setLoadingItems] = useState(false);
   const [spinning, setSpinning] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [spinTargetAngle, setSpinTargetAngle] = useState(null);
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
@@ -760,7 +761,7 @@ export default function Deal({
   };
 
   const submitSpin = async (demo = false) => {
-    if (spinning || !selectedItem) return;
+    if (spinning || submitting || !selectedItem) return;
 
     if (!demo && !authUser) {
       openAuth?.();
@@ -783,7 +784,11 @@ export default function Deal({
       return;
     }
 
-    setSpinning(true);
+    // Keep the pointer locked at North while the server processes the bet.
+    // The actual spin begins only after the server has accepted the wager
+    // and returned the authoritative result.
+    setSubmitting(true);
+    setSpinning(false);
     setSpinTargetAngle(null);
     setResult(null);
     setWinPopup(null);
@@ -827,7 +832,9 @@ export default function Deal({
         onBalanceChange?.(Number(data.newBalanceCents) / 100);
       }
 
+      setSubmitting(false);
       setSpinTargetAngle(targetAngle);
+      setSpinning(true);
       startDealSpinSound(targetAngle);
 
       window.setTimeout(async () => {
@@ -844,6 +851,7 @@ export default function Deal({
           });
         }
         setSpinning(false);
+        setSubmitting(false);
         stopDealSpinSound(Boolean(data.won));
 
         if (!demo) {
@@ -858,6 +866,7 @@ export default function Deal({
       stopDealSpinSound(false, false);
         setSpinTargetAngle(null);
       setSpinning(false);
+      setSubmitting(false);
       setError(spinError?.message || "Deal spin failed. Please try again.");
     }
   };
@@ -867,7 +876,7 @@ export default function Deal({
       <div className="casex-deal-shell">
         <header className="deal-header">
           <div className="deal-header-brand">
-            <button type="button" className="deal-back" onClick={onClose} disabled={spinning}>
+            <button type="button" className="deal-back" onClick={onClose} disabled={spinning || submitting}>
               ←
             </button>
             <div>
@@ -979,10 +988,10 @@ export default function Deal({
               result={result}
             />
             <div className="deal-spin-actions">
-              <button type="button" className="deal-spin-button" onClick={() => submitSpin(false)} disabled={spinning || !selectedItem}>
-                {spinning ? "DEALING..." : `Deal for ${money(betCents)}`}
+              <button type="button" className="deal-spin-button" onClick={() => submitSpin(false)} disabled={spinning || submitting || !selectedItem}>
+                {submitting ? "STARTING..." : spinning ? "DEALING..." : `Deal for ${money(betCents)}`}
               </button>
-              <button type="button" className="deal-demo-button" onClick={() => submitSpin(true)} disabled={spinning || !selectedItem}>
+              <button type="button" className="deal-demo-button" onClick={() => submitSpin(true)} disabled={spinning || submitting || !selectedItem}>
                 ↻ Demo
               </button>
             </div>

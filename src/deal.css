@@ -2144,3 +2144,12 @@ body.casex-global-sidebar-closed .casex-deal-page{
     font-size:10px;
   }
 }
+
+/* DEAL V17 FINAL — JavaScript owns the spin; prevent any legacy CSS animation
+   from competing with the requestAnimationFrame pointer. */
+.deal-ring,
+.deal-ring.is-spinning,
+.deal-ring.is-spinning .deal-ring-pointer,
+.deal-ring.is-spinning .deal-ring-rotor{
+  animation:none !important;
+}
