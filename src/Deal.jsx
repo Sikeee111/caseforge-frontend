@@ -804,7 +804,7 @@ export default function Deal({
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          itemId: Number(selectedItem.itemId),
+          listingId: Number(selectedItem.listingId),
           betCents: normalizedBet,
         }),
       });
