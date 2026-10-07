@@ -2153,3 +2153,27 @@ body.casex-global-sidebar-closed .casex-deal-page{
 .deal-ring.is-spinning .deal-ring-rotor{
   animation:none !important;
 }
+
+/* ============================================================
+   DEAL V22 — DARK SORT DROPDOWN
+   Keep the native catalogue sort menu consistent with the CASEX UI.
+   ============================================================ */
+.deal-browser-controls > select,
+.deal-browser-controls select{
+  color-scheme:dark !important;
+  background:#11141a !important;
+  color:#e9eaf0 !important;
+  border-color:#262a34 !important;
+}
+
+.deal-browser-controls select option,
+.deal-browser-controls select optgroup{
+  background-color:#11141a !important;
+  color:#f1f3f7 !important;
+  font-weight:800 !important;
+}
+
+.deal-browser-controls select option:checked{
+  background-color:#6f43d8 !important;
+  color:#fff !important;
+}
