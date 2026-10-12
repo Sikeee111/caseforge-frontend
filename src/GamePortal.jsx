@@ -198,6 +198,8 @@ export default function GamePortal({
   const [buyingId, setBuyingId] = useState(null);
   const [purchaseConfirmItem, setPurchaseConfirmItem] = useState(null);
   const [search, setSearch] = useState("");
+  const [marketplaceSort, setMarketplaceSort] = useState("price_asc");
+  const [marketplaceRarity, setMarketplaceRarity] = useState("all");
   const [message, setMessage] = useState("");
   const [actionItem, setActionItem] = useState(null);
   const [actionType, setActionType] = useState(null);
@@ -226,6 +228,8 @@ export default function GamePortal({
   const [brainrotDepositItems, setBrainrotDepositItems] = useState([]);
   const [brainrotDepositItemsLoading, setBrainrotDepositItemsLoading] = useState(false);
   const [brainrotDepositSearch, setBrainrotDepositSearch] = useState("");
+  const [depositSort, setDepositSort] = useState("value_asc");
+  const [depositRarity, setDepositRarity] = useState("all");
   const [selectedBrainrotDepositItemId, setSelectedBrainrotDepositItemId] = useState(null);
   const reelTrackRef = useRef(null);
   const reelWindowRef = useRef(null);
@@ -439,15 +443,38 @@ export default function GamePortal({
 
   const filteredBrainrotDepositItems = useMemo(() => {
     const query = brainrotDepositSearch.trim().toLowerCase();
+    const rarityRank = { common: 0, rare: 1, epic: 2, legendary: 3, secret: 4 };
 
-    if (!query) return brainrotDepositItems;
+    const filtered = brainrotDepositItems.filter((item) => {
+      const matchesQuery = !query ||
+        [item.name, item.rarity].some((value) =>
+          String(value || "").toLowerCase().includes(query)
+        );
+      const matchesRarity = depositRarity === "all" ||
+        String(item.rarity || "Common").toLowerCase() === depositRarity;
+      return matchesQuery && matchesRarity;
+    });
 
-    return brainrotDepositItems.filter((item) =>
-      [item.name, item.rarity].some((value) =>
-        String(value || "").toLowerCase().includes(query)
-      )
-    );
-  }, [brainrotDepositItems, brainrotDepositSearch]);
+    return [...filtered].sort((a, b) => {
+      if (depositSort === "value_desc") {
+        return Number(b.value_cents || 0) - Number(a.value_cents || 0) ||
+          String(a.name || "").localeCompare(String(b.name || ""));
+      }
+      if (depositSort === "name_asc") {
+        return String(a.name || "").localeCompare(String(b.name || ""));
+      }
+      if (depositSort === "name_desc") {
+        return String(b.name || "").localeCompare(String(a.name || ""));
+      }
+      if (depositSort === "rarity") {
+        return (rarityRank[String(a.rarity || "Common").toLowerCase()] ?? 99) -
+          (rarityRank[String(b.rarity || "Common").toLowerCase()] ?? 99) ||
+          String(a.name || "").localeCompare(String(b.name || ""));
+      }
+      return Number(a.value_cents || 0) - Number(b.value_cents || 0) ||
+        String(a.name || "").localeCompare(String(b.name || ""));
+    });
+  }, [brainrotDepositItems, brainrotDepositSearch, depositSort, depositRarity]);
 
   const selectedBrainrotDepositItem = useMemo(() => {
     if (!filteredBrainrotDepositItems.length) return null;
@@ -1144,13 +1171,38 @@ export default function GamePortal({
 
   const filteredMarketplace = useMemo(() => {
     const query = search.trim().toLowerCase();
-    if (!query) return marketplace;
-    return marketplace.filter((item) =>
-      [item.name, item.rarity].some((value) =>
-        String(value || "").toLowerCase().includes(query)
-      )
-    );
-  }, [marketplace, search]);
+    const rarityRank = { common: 0, rare: 1, epic: 2, legendary: 3, secret: 4 };
+
+    const filtered = marketplace.filter((item) => {
+      const matchesQuery = !query ||
+        [item.name, item.rarity].some((value) =>
+          String(value || "").toLowerCase().includes(query)
+        );
+      const matchesRarity = marketplaceRarity === "all" ||
+        String(item.rarity || "Common").toLowerCase() === marketplaceRarity;
+      return matchesQuery && matchesRarity;
+    });
+
+    return [...filtered].sort((a, b) => {
+      if (marketplaceSort === "price_desc") {
+        return Number(b.priceCents || 0) - Number(a.priceCents || 0) ||
+          String(a.name || "").localeCompare(String(b.name || ""));
+      }
+      if (marketplaceSort === "name_asc") {
+        return String(a.name || "").localeCompare(String(b.name || ""));
+      }
+      if (marketplaceSort === "name_desc") {
+        return String(b.name || "").localeCompare(String(a.name || ""));
+      }
+      if (marketplaceSort === "rarity") {
+        return (rarityRank[String(a.rarity || "Common").toLowerCase()] ?? 99) -
+          (rarityRank[String(b.rarity || "Common").toLowerCase()] ?? 99) ||
+          String(a.name || "").localeCompare(String(b.name || ""));
+      }
+      return Number(a.priceCents || 0) - Number(b.priceCents || 0) ||
+        String(a.name || "").localeCompare(String(b.name || ""));
+    });
+  }, [marketplace, search, marketplaceSort, marketplaceRarity]);
 
   const selectGame = (slug) => {
     // DonutSMP is intentionally held back for launch. Keep it visible in the
@@ -1160,6 +1212,8 @@ export default function GamePortal({
     setSelectedSlug(slug);
     setTab("marketplace");
     setSearch("");
+    setMarketplaceSort("price_asc");
+    setMarketplaceRarity("all");
     setMessage("");
   };
 
@@ -1413,6 +1467,88 @@ export default function GamePortal({
           }
           .game-hub-card-coming-soon:disabled {
             pointer-events: none;
+          }
+          .game-portal-catalog-controls {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 8px;
+            flex-wrap: wrap;
+            max-width: 100%;
+          }
+          .game-portal-catalog-controls input,
+          .game-portal-catalog-controls select,
+          .game-portal-catalog-select {
+            min-width: 150px;
+            max-width: 205px;
+            min-height: 40px;
+            box-sizing: border-box;
+            border: 1px solid #2b2f3a;
+            border-radius: 9px;
+            padding: 0 11px;
+            background: #101219;
+            color: #e7e9f0;
+            font: inherit;
+            font-size: 11px;
+            font-weight: 700;
+            color-scheme: dark;
+          }
+          .game-portal-catalog-controls select,
+          .game-portal-catalog-select {
+            cursor: pointer;
+          }
+          .game-portal-catalog-controls select option,
+          .game-portal-catalog-select option {
+            background: #151720;
+            color: #f5f6fa;
+          }
+          .game-portal-brainrot-deposit-controls {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 7px;
+            min-width: 0;
+            max-width: 100%;
+          }
+          .game-portal-brainrot-deposit-controls .game-portal-brainrot-deposit-search {
+            flex: 1 1 220px;
+            min-width: 150px;
+          }
+          .game-portal-brainrot-deposit-controls .game-portal-catalog-select {
+            min-width: 145px;
+            max-width: 180px;
+            min-height: 38px;
+          }
+          @media (max-width: 900px) {
+            .game-portal-catalog-controls {
+              justify-content: flex-start;
+              width: 100%;
+            }
+            .game-portal-catalog-controls input,
+            .game-portal-catalog-controls select {
+              flex: 1 1 160px;
+              min-width: 0;
+              max-width: none;
+            }
+            .game-portal-brainrot-deposit-controls {
+              justify-content: flex-start;
+              width: 100%;
+            }
+            .game-portal-brainrot-deposit-controls .game-portal-catalog-select {
+              flex: 1 1 145px;
+              min-width: 0;
+              max-width: none;
+            }
+          }
+          @media (max-width: 600px) {
+            .game-portal-catalog-controls input,
+            .game-portal-catalog-controls select,
+            .game-portal-brainrot-deposit-controls .game-portal-catalog-select {
+              flex: 1 1 100%;
+              width: 100%;
+              max-width: none;
+            }
           }
         `}</style>
         <div className="game-portal-header">
@@ -1686,7 +1822,37 @@ export default function GamePortal({
               <section className="game-portal-section">
                 <div className="game-portal-section-head">
                   <div><span className="game-portal-kicker">SHOP</span><h2>Buy {selectedGame.name} items</h2><p>Purchase available stock directly with your CaseX balance.</p></div>
-                  <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search items..." />
+                  <div className="game-portal-catalog-controls">
+                    <input
+                      value={search}
+                      onChange={(event) => setSearch(event.target.value)}
+                      placeholder="Search items..."
+                      aria-label="Search marketplace items"
+                    />
+                    <select
+                      value={marketplaceSort}
+                      onChange={(event) => setMarketplaceSort(event.target.value)}
+                      aria-label="Sort marketplace items"
+                    >
+                      <option value="price_asc">Price: Low to High</option>
+                      <option value="price_desc">Price: High to Low</option>
+                      <option value="name_asc">Name: A to Z</option>
+                      <option value="name_desc">Name: Z to A</option>
+                      <option value="rarity">Rarity: Low to High</option>
+                    </select>
+                    <select
+                      value={marketplaceRarity}
+                      onChange={(event) => setMarketplaceRarity(event.target.value)}
+                      aria-label="Filter marketplace by rarity"
+                    >
+                      <option value="all">All rarities</option>
+                      <option value="common">Common</option>
+                      <option value="rare">Rare</option>
+                      <option value="epic">Epic</option>
+                      <option value="legendary">Legendary</option>
+                      <option value="secret">Secret</option>
+                    </select>
+                  </div>
                 </div>
                 {loading ? <div className="game-portal-empty">Loading marketplace...</div> : filteredMarketplace.length === 0 ? <div className="game-portal-empty"><strong>No items listed yet.</strong><span>Marketplace stock will appear here once you add listings from Admin.</span></div> : (
                   <div className="game-portal-item-grid">
@@ -1800,24 +1966,52 @@ export default function GamePortal({
                         <h3>Find your Brainrot</h3>
                       </div>
 
-                      <div className="game-portal-brainrot-deposit-search">
-                        <span>⌕</span>
-                        <input
-                          value={brainrotDepositSearch}
-                          onChange={(event) =>
-                            setBrainrotDepositSearch(event.target.value)
-                          }
-                          placeholder="Search Brainrots..."
-                        />
-                        {brainrotDepositSearch && (
-                          <button
-                            type="button"
-                            onClick={() => setBrainrotDepositSearch("")}
-                            aria-label="Clear search"
-                          >
-                            ×
-                          </button>
-                        )}
+                      <div className="game-portal-brainrot-deposit-controls">
+                        <div className="game-portal-brainrot-deposit-search">
+                          <span>⌕</span>
+                          <input
+                            value={brainrotDepositSearch}
+                            onChange={(event) =>
+                              setBrainrotDepositSearch(event.target.value)
+                            }
+                            placeholder="Search Brainrots..."
+                            aria-label="Search deposit Brainrots"
+                          />
+                          {brainrotDepositSearch && (
+                            <button
+                              type="button"
+                              onClick={() => setBrainrotDepositSearch("")}
+                              aria-label="Clear search"
+                            >
+                              ×
+                            </button>
+                          )}
+                        </div>
+                        <select
+                          className="game-portal-catalog-select"
+                          value={depositSort}
+                          onChange={(event) => setDepositSort(event.target.value)}
+                          aria-label="Sort deposit Brainrots"
+                        >
+                          <option value="value_asc">Value: Low to High</option>
+                          <option value="value_desc">Value: High to Low</option>
+                          <option value="name_asc">Name: A to Z</option>
+                          <option value="name_desc">Name: Z to A</option>
+                          <option value="rarity">Rarity: Low to High</option>
+                        </select>
+                        <select
+                          className="game-portal-catalog-select"
+                          value={depositRarity}
+                          onChange={(event) => setDepositRarity(event.target.value)}
+                          aria-label="Filter deposit Brainrots by rarity"
+                        >
+                          <option value="all">All rarities</option>
+                          <option value="common">Common</option>
+                          <option value="rare">Rare</option>
+                          <option value="epic">Epic</option>
+                          <option value="legendary">Legendary</option>
+                          <option value="secret">Secret</option>
+                        </select>
                       </div>
                     </div>
 
