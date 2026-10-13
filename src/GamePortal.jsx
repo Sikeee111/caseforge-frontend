@@ -231,6 +231,10 @@ export default function GamePortal({
   const [depositSort, setDepositSort] = useState("value_asc");
   const [depositRarity, setDepositRarity] = useState("all");
   const [selectedBrainrotDepositItemId, setSelectedBrainrotDepositItemId] = useState(null);
+  const [depositTicketModal, setDepositTicketModal] = useState(null);
+  const [depositTicketLoading, setDepositTicketLoading] = useState(false);
+  const [depositTicketError, setDepositTicketError] = useState("");
+  const [depositCodeCopied, setDepositCodeCopied] = useState(false);
   const reelTrackRef = useRef(null);
   const reelWindowRef = useRef(null);
   const portalScrollTopRef = useRef(0);
@@ -1408,12 +1412,259 @@ export default function GamePortal({
     }
   };
 
+  const openBrainrotDepositCode = async () => {
+    if (depositTicketLoading) return;
+
+    if (!authUser) {
+      openAuth?.("login");
+      return;
+    }
+
+    setDepositTicketLoading(true);
+    setDepositTicketError("");
+    setDepositCodeCopied(false);
+
+    try {
+      const response = await apiFetch(`${API}/api/me/brainrot-deposits`, {
+        method: "POST",
+        body: JSON.stringify({}),
+      });
+      const data = await response.json().catch(() => ({}));
+      const depositCode = String(data?.deposit?.deposit_code || "").trim();
+
+      if (!response.ok || !depositCode) {
+        throw new Error(
+          data?.error || data?.message || "Could not create your deposit code. Please try again."
+        );
+      }
+
+      setDepositTicketModal({
+        code: depositCode,
+        discordUrl: data.discordUrl || "https://discord.gg/6t9bzvnndd",
+        message: data.message || "Open a Discord ticket and include this code.",
+        alreadyPending: data.created === false,
+      });
+    } catch (error) {
+      console.error("Brainrot deposit code creation failed:", error);
+      setDepositTicketError(error?.message || "Could not create your deposit code. Please try again.");
+    } finally {
+      setDepositTicketLoading(false);
+    }
+  };
+
+  const copyBrainrotDepositCode = async () => {
+    const code = String(depositTicketModal?.code || "");
+    if (!code) return;
+
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(code);
+      } else {
+        const temporaryInput = document.createElement("textarea");
+        temporaryInput.value = code;
+        temporaryInput.setAttribute("readonly", "");
+        temporaryInput.style.position = "fixed";
+        temporaryInput.style.opacity = "0";
+        document.body.appendChild(temporaryInput);
+        temporaryInput.select();
+        const copied = document.execCommand("copy");
+        temporaryInput.remove();
+        if (!copied) throw new Error("Clipboard unavailable");
+      }
+      setDepositCodeCopied(true);
+    } catch (error) {
+      console.error("Deposit code copy failed:", error);
+      setDepositTicketError("Copy failed. Please select the code and copy it manually.");
+    }
+  };
+
+  const closeBrainrotDepositCode = () => {
+    setDepositTicketModal(null);
+    setDepositTicketError("");
+    setDepositCodeCopied(false);
+  };
+
+  useEffect(() => {
+    if (!depositTicketModal) return undefined;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") closeBrainrotDepositCode();
+    };
+    document.addEventListener("keydown", onKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [depositTicketModal]);
+
   if (!open) return null;
 
   return (
     <div className={`game-portal-overlay ${selectedGame?.theme === "blue" ? "game-portal-theme-blue" : "game-portal-theme-purple"}`}>
       <div className="game-portal-shell">
         <style>{`
+          .game-portal-deposit-code-backdrop {
+            position: fixed;
+            inset: 0;
+            z-index: 5000;
+            display: grid;
+            place-items: center;
+            padding: 18px;
+            box-sizing: border-box;
+            background: rgba(3, 4, 9, .78);
+            backdrop-filter: blur(9px);
+            -webkit-backdrop-filter: blur(9px);
+          }
+          .game-portal-deposit-code-modal {
+            position: relative;
+            width: min(460px, 100%);
+            max-height: min(90vh, 760px);
+            overflow-y: auto;
+            padding: 26px;
+            box-sizing: border-box;
+            border: 1px solid rgba(157, 108, 255, .38);
+            border-radius: 20px;
+            color: #f5f6fa;
+            background: radial-gradient(circle at 50% 0%, rgba(139, 92, 246, .18), transparent 42%), linear-gradient(160deg, #141620, #0b0d13 72%);
+            box-shadow: 0 28px 90px rgba(0, 0, 0, .6), 0 0 40px rgba(139, 92, 246, .12);
+          }
+          .game-portal-deposit-code-close {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            display: grid;
+            place-items: center;
+            width: 34px;
+            height: 34px;
+            border: 1px solid #303341;
+            border-radius: 10px;
+            color: #c9cbd5;
+            background: #181a24;
+            font-size: 21px;
+            cursor: pointer;
+          }
+          .game-portal-deposit-code-modal h2 {
+            margin: 8px 34px 8px 0;
+            font-size: 25px;
+            line-height: 1.15;
+            letter-spacing: -.6px;
+          }
+          .game-portal-deposit-code-description {
+            margin: 0 0 20px;
+            color: #9296a5;
+            font-size: 13px;
+            line-height: 1.6;
+          }
+          .game-portal-deposit-code-field {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 14px;
+            border: 1px solid rgba(157, 108, 255, .32);
+            border-radius: 13px;
+            background: rgba(7, 8, 14, .76);
+          }
+          .game-portal-deposit-code-field > div {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            min-width: 0;
+          }
+          .game-portal-deposit-code-field small {
+            color: #8e93a3;
+            font-size: 9px;
+            font-weight: 900;
+            letter-spacing: 1.25px;
+          }
+          .game-portal-deposit-code-value {
+            color: #c09bff;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            font-size: clamp(18px, 4vw, 23px);
+            font-weight: 900;
+            letter-spacing: .7px;
+            overflow-wrap: anywhere;
+          }
+          .game-portal-deposit-code-copy {
+            flex: 0 0 auto;
+            min-height: 38px;
+            padding: 0 13px;
+            border: 1px solid #4e3b78;
+            border-radius: 9px;
+            color: #eee7ff;
+            background: #211832;
+            font-size: 11px;
+            font-weight: 850;
+            cursor: pointer;
+          }
+          .game-portal-deposit-code-steps {
+            display: grid;
+            gap: 10px;
+            margin: 17px 0 20px;
+            color: #b6bac6;
+            font-size: 12px;
+            line-height: 1.5;
+          }
+          .game-portal-deposit-code-steps span {
+            display: flex;
+            align-items: flex-start;
+            gap: 9px;
+          }
+          .game-portal-deposit-code-steps b {
+            display: grid;
+            place-items: center;
+            flex: 0 0 20px;
+            width: 20px;
+            height: 20px;
+            border-radius: 7px;
+            color: #d9c6ff;
+            background: rgba(157, 108, 255, .16);
+            font-size: 10px;
+          }
+          .game-portal-deposit-code-actions {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr);
+            gap: 9px;
+          }
+          .game-portal-deposit-code-open {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 46px;
+            padding: 0 16px;
+            border: 0;
+            border-radius: 10px;
+            color: #fff;
+            background: linear-gradient(110deg, #9b67ff, #7540dc);
+            box-shadow: 0 8px 25px rgba(123, 70, 220, .2);
+            font-size: 12px;
+            font-weight: 900;
+            cursor: pointer;
+          }
+          .game-portal-deposit-code-cancel {
+            min-height: 40px;
+            border: 1px solid #303341;
+            border-radius: 10px;
+            color: #aeb2bf;
+            background: #151720;
+            font-size: 11px;
+            font-weight: 800;
+            cursor: pointer;
+          }
+          .game-portal-deposit-code-error {
+            margin-top: 11px;
+            color: #ff9696;
+            font-size: 11px;
+            font-weight: 700;
+          }
+          @media (max-width: 480px) {
+            .game-portal-deposit-code-modal { padding: 21px 17px; border-radius: 16px; }
+            .game-portal-deposit-code-field { align-items: stretch; flex-direction: column; }
+            .game-portal-deposit-code-copy { width: 100%; }
+          }
           .game-hub-card-coming-soon {
             position: relative;
             cursor: not-allowed !important;
@@ -2114,16 +2365,16 @@ export default function GamePortal({
                         <button
                           type="button"
                           className="game-portal-brainrot-deposit-discord"
-                          onClick={() =>
-                            window.open(
-                              "https://discord.gg/6t9bzvnndd",
-                              "_blank",
-                              "noopener,noreferrer"
-                            )
-                          }
+                          onClick={() => void openBrainrotDepositCode()}
+                          disabled={depositTicketLoading}
                         >
-                          Open Discord Ticket →
+                          {depositTicketLoading ? "Generating Deposit Code..." : "Open Discord Ticket →"}
                         </button>
+                        {depositTicketError && !depositTicketModal && (
+                          <div className="game-portal-deposit-code-error" role="alert">
+                            {depositTicketError}
+                          </div>
+                        )}
                       </>
                     ) : (
                       <div className="game-portal-brainrot-deposit-detail-empty">
@@ -2618,6 +2869,84 @@ export default function GamePortal({
                   </button>
                 </div>
               </div>
+            </div>,
+            document.body
+          )
+        : null}
+
+      {depositTicketModal && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              className="game-portal-deposit-code-backdrop"
+              onClick={closeBrainrotDepositCode}
+              role="presentation"
+            >
+              <section
+                className="game-portal-deposit-code-modal"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="game-portal-deposit-code-title"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <button
+                  type="button"
+                  className="game-portal-deposit-code-close"
+                  onClick={closeBrainrotDepositCode}
+                  aria-label="Close deposit code dialog"
+                >
+                  ×
+                </button>
+                <div className="game-portal-kicker">BRAINROT DEPOSIT</div>
+                <h2 id="game-portal-deposit-code-title">
+                  {depositTicketModal.alreadyPending ? "Your Pending Deposit Code" : "Your Deposit Code Is Ready"}
+                </h2>
+                <p className="game-portal-deposit-code-description">
+                  Copy this code and include it in your Discord ticket so staff can identify your deposit request.
+                </p>
+
+                <div className="game-portal-deposit-code-field">
+                  <div>
+                    <small>YOUR UNIQUE DEPOSIT CODE</small>
+                    <strong className="game-portal-deposit-code-value">{depositTicketModal.code}</strong>
+                  </div>
+                  <button
+                    type="button"
+                    className="game-portal-deposit-code-copy"
+                    onClick={() => void copyBrainrotDepositCode()}
+                  >
+                    {depositCodeCopied ? "Copied ✓" : "Copy Code"}
+                  </button>
+                </div>
+
+                <div className="game-portal-deposit-code-steps">
+                  <span><b>1</b> Open a Discord ticket using the button below.</span>
+                  <span><b>2</b> Send the deposit code above and tell staff which Brainrot you want to deposit.</span>
+                  <span><b>3</b> Transfer the item in-game only after staff tells you how to proceed. Your balance is credited after the transfer is verified.</span>
+                </div>
+
+                {depositTicketError && (
+                  <div className="game-portal-deposit-code-error" role="alert">
+                    {depositTicketError}
+                  </div>
+                )}
+
+                <div className="game-portal-deposit-code-actions">
+                  <button
+                    type="button"
+                    className="game-portal-deposit-code-open"
+                    onClick={() => window.open(depositTicketModal.discordUrl, "_blank", "noopener,noreferrer")}
+                  >
+                    Open Discord Ticket →
+                  </button>
+                  <button
+                    type="button"
+                    className="game-portal-deposit-code-cancel"
+                    onClick={closeBrainrotDepositCode}
+                  >
+                    Close
+                  </button>
+                </div>
+              </section>
             </div>,
             document.body
           )
